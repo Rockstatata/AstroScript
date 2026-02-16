@@ -6,9 +6,9 @@
 int yylex();
 void yyerror(const char *s);
 extern FILE *yyin;
+extern int yylineno;
 %}
 
-%define parse.error verbose
 
 %union {
     int intval;
@@ -20,10 +20,13 @@ extern FILE *yyin;
 %token MODULE DEPLOY EXTENDS PUBLIC PRIVATE THIS
 %token TELEMETRY LIMIT ALIAS FLEET MODE
 %token COMMAND BACK
+%token BROADCAST RECEIVE ALARM
 %token VERIFY ELSE_VERIFY OTHERWISE
 %token ORBIT SCENARIO TRAJECTORY FALLBACK
 %token STAGE_SEP COAST
 %token WAIT TICK
+%token ROOT FLR CEIL ABS LOGARITHM SINE COSINE TAN ASINE ACOSINE ATAN PRIME
+%token WHILE TIMES
 
 %token COUNT REAL PRECISE FLAG SYMBOL VOIDSPACE
 
@@ -32,6 +35,7 @@ extern FILE *yyin;
 
 %token LT GT LE GE EQ NEQ
 %token ASSIGN
+%token RETTYPE
 
 %token LBRACKET RBRACKET
 %token LBRACE RBRACE LPAREN RPAREN
@@ -43,9 +47,6 @@ extern FILE *yyin;
 
 %nonassoc LOWER_THAN_ELSE
 %nonassoc ELSE_VERIFY OTHERWISE
-
-%left DOT
-%left LPAREN
 
 %%
 
@@ -118,6 +119,8 @@ control_statement
 
 loop_statement
     : ORBIT LPAREN expression RPAREN block
+    | ORBIT WHILE LPAREN expression RPAREN block
+    | ORBIT TIMES LPAREN expression COLON expression COLON expression RPAREN block
     ;
 
 switch_statement
@@ -160,7 +163,12 @@ class_member
     ;
 
 function_definition
-    : COMMAND IDENTIFIER LPAREN parameter_list RPAREN COLON type block
+    : COMMAND IDENTIFIER LPAREN parameter_list RPAREN return_type type block
+    ;
+
+return_type
+    : COLON
+    | RETTYPE
     ;
 
 parameter_list
@@ -229,7 +237,6 @@ unary_expression
 postfix_expression
     : primary_expression
     | postfix_expression LPAREN argument_list RPAREN
-    | postfix_expression DOT IDENTIFIER
     | postfix_expression LBRACKET expression RBRACKET
     ;
 
@@ -240,7 +247,26 @@ primary_expression
     | FLOAT_LITERAL
     | STRING_LITERAL
     | DEPLOY IDENTIFIER LPAREN RPAREN
+    | builtin_call
     | LPAREN expression RPAREN
+    ;
+
+builtin_call
+    : BROADCAST LPAREN argument_list RPAREN
+    | RECEIVE LPAREN RPAREN
+    | ALARM LPAREN argument_list RPAREN
+    | ROOT LPAREN expression RPAREN
+    | FLR LPAREN expression RPAREN
+    | CEIL LPAREN expression RPAREN
+    | ABS LPAREN expression RPAREN
+    | LOGARITHM LPAREN expression RPAREN
+    | SINE LPAREN expression RPAREN
+    | COSINE LPAREN expression RPAREN
+    | TAN LPAREN expression RPAREN
+    | ASINE LPAREN expression RPAREN
+    | ACOSINE LPAREN expression RPAREN
+    | ATAN LPAREN expression RPAREN
+    | PRIME LPAREN expression RPAREN
     ;
 
 argument_list
@@ -253,7 +279,7 @@ argument_list
 %%
 
 void yyerror(const char *s) {
-    printf("SYNTAX ERROR: %s\n", s);
+    printf("SYNTAX ERROR at line %d: %s\n", yylineno, s);
 }
 
 int main(int argc, char** argv) {

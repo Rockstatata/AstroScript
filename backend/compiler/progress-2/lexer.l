@@ -40,12 +40,17 @@ STRING_LITERAL  \"([^\"\n])*\"
 
 "command"          { return COMMAND; }
 "back"             { return BACK; }
+"broadcast"        { return BROADCAST; }
+"receive"          { return RECEIVE; }
+"alarm"            { return ALARM; }
 
 "verify"           { return VERIFY; }
 "else_verify"      { return ELSE_VERIFY; }
 "otherwise"        { return OTHERWISE; }
 
 "orbit"            { return ORBIT; }
+"while"            { return WHILE; }
+"times"            { return TIMES; }
 "scenario"         { return SCENARIO; }
 "trajectory"       { return TRAJECTORY; }
 "fallback"         { return FALLBACK; }
@@ -55,6 +60,18 @@ STRING_LITERAL  \"([^\"\n])*\"
 
 "wait"             { return WAIT; }
 "tick"             { return TICK; }
+"root"             { return ROOT; }
+"flr"              { return FLR; }
+"ceil"             { return CEIL; }
+"abs"              { return ABS; }
+"logarithm"        { return LOGARITHM; }
+"sine"             { return SINE; }
+"cosine"           { return COSINE; }
+"tan"              { return TAN; }
+"asine"            { return ASINE; }
+"acosine"          { return ACOSINE; }
+"atan"             { return ATAN; }
+"prime"            { return PRIME; }
 
 "count"            { return COUNT; }
 "real"             { return REAL; }
@@ -83,6 +100,7 @@ STRING_LITERAL  \"([^\"\n])*\"
 ">"                { return GT; }
 
 ":="               { return ASSIGN; }
+":->"             { return RETTYPE; }
 
 "{"                { return LBRACE; }
 "}"                { return RBRACE; }
