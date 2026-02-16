@@ -1,0 +1,2449 @@
+State 50 conflicts: 1 shift/reduce
+
+
+Grammar
+
+    0 $accept: program $end
+
+    1 program: mission_block SUCCESS
+
+    2 mission_block: MISSION IDENTIFIER LAUNCH block
+
+    3 block: LBRACE statement_list RBRACE
+
+    4 statement_list: statement_list statement
+    5               | /* empty */
+
+    6 statement: declaration
+    7          | expression DOT
+    8          | control_statement
+    9          | loop_statement
+   10          | switch_statement
+   11          | module_definition
+   12          | wait_statement
+   13          | STAGE_SEP DOT
+   14          | COAST DOT
+   15          | BACK DOT
+   16          | ABORT DOT
+
+   17 declaration: TELEMETRY type IDENTIFIER DOT
+   18            | TELEMETRY type IDENTIFIER ASSIGN expression DOT
+   19            | LIMIT type IDENTIFIER ASSIGN expression DOT
+   20            | ALIAS type IDENTIFIER DOT
+   21            | FLEET type IDENTIFIER DOT
+   22            | MODE IDENTIFIER LBRACE mode_body RBRACE
+
+   23 mode_body: mode_body mode_entry
+   24          | /* empty */
+
+   25 mode_entry: TRAJECTORY INT_LITERAL DOT
+   26           | FALLBACK INT_LITERAL DOT
+
+   27 type: COUNT
+   28     | REAL
+   29     | PRECISE
+   30     | FLAG
+   31     | SYMBOL
+   32     | VOIDSPACE
+
+   33 control_statement: VERIFY LPAREN expression RPAREN block
+   34                  | VERIFY LPAREN expression RPAREN block ELSE_VERIFY LPAREN expression RPAREN block
+   35                  | VERIFY LPAREN expression RPAREN block OTHERWISE block
+
+   36 loop_statement: ORBIT LPAREN expression RPAREN block
+
+   37 switch_statement: SCENARIO LPAREN expression RPAREN LBRACE case_list RBRACE
+
+   38 case_list: case_list case_entry
+   39          | /* empty */
+
+   40 case_entry: TRAJECTORY INT_LITERAL COLON statement_list
+   41           | FALLBACK COLON statement_list
+
+   42 wait_statement: WAIT INT_LITERAL TICK DOT
+
+   43 module_definition: MODULE IDENTIFIER inheritance LBRACE class_body RBRACE
+
+   44 inheritance: EXTENDS IDENTIFIER
+   45            | /* empty */
+
+   46 class_body: class_body class_member
+   47           | /* empty */
+
+   48 class_member: declaration
+   49             | PUBLIC declaration
+   50             | PRIVATE declaration
+   51             | function_definition
+
+   52 function_definition: COMMAND IDENTIFIER LPAREN parameter_list RPAREN COLON type block
+
+   53 parameter_list: parameter_list COMMA parameter
+   54               | parameter
+   55               | /* empty */
+
+   56 parameter: type IDENTIFIER
+
+   57 expression: assignment_expression
+
+   58 assignment_expression: logical_expression
+   59                      | logical_expression ASSIGN assignment_expression
+
+   60 logical_expression: logical_expression OR equality_expression
+   61                   | logical_expression AND equality_expression
+   62                   | logical_expression XOR equality_expression
+   63                   | equality_expression
+
+   64 equality_expression: equality_expression EQ relational_expression
+   65                    | equality_expression NEQ relational_expression
+   66                    | relational_expression
+
+   67 relational_expression: relational_expression LT additive_expression
+   68                      | relational_expression GT additive_expression
+   69                      | relational_expression LE additive_expression
+   70                      | relational_expression GE additive_expression
+   71                      | additive_expression
+
+   72 additive_expression: additive_expression ADD multiplicative_expression
+   73                    | additive_expression MINUS multiplicative_expression
+   74                    | multiplicative_expression
+
+   75 multiplicative_expression: multiplicative_expression MUL power_expression
+   76                          | multiplicative_expression DIVIDE power_expression
+   77                          | multiplicative_expression MOD power_expression
+   78                          | power_expression
+
+   79 power_expression: power_expression POWER unary_expression
+   80                 | unary_expression
+
+   81 unary_expression: NOT unary_expression
+   82                 | postfix_expression
+
+   83 postfix_expression: primary_expression
+   84                   | postfix_expression LPAREN argument_list RPAREN
+   85                   | postfix_expression DOT IDENTIFIER
+
+   86 primary_expression: IDENTIFIER
+   87                   | THIS
+   88                   | INT_LITERAL
+   89                   | FLOAT_LITERAL
+   90                   | STRING_LITERAL
+   91                   | DEPLOY IDENTIFIER LPAREN RPAREN
+   92                   | LPAREN expression RPAREN
+
+   93 argument_list: argument_list COMMA expression
+   94              | expression
+   95              | /* empty */
+
+
+Terminals, with rules where they appear
+
+$end (0) 0
+error (256)
+MISSION (258) 2
+LAUNCH (259) 2
+SUCCESS (260) 1
+ABORT (261) 16
+MODULE (262) 43
+DEPLOY (263) 91
+EXTENDS (264) 44
+PUBLIC (265) 49
+PRIVATE (266) 50
+THIS (267) 87
+TELEMETRY (268) 17 18
+LIMIT (269) 19
+ALIAS (270) 20
+FLEET (271) 21
+MODE (272) 22
+COMMAND (273) 52
+BACK (274) 15
+VERIFY (275) 33 34 35
+ELSE_VERIFY (276) 34
+OTHERWISE (277) 35
+ORBIT (278) 36
+SCENARIO (279) 37
+TRAJECTORY (280) 25 40
+FALLBACK (281) 26 41
+STAGE_SEP (282) 13
+COAST (283) 14
+WAIT (284) 42
+TICK (285) 42
+COUNT (286) 27
+REAL (287) 28
+PRECISE (288) 29
+FLAG (289) 30
+SYMBOL (290) 31
+VOIDSPACE (291) 32
+ADD (292) 72
+MINUS (293) 73
+MUL (294) 75
+DIVIDE (295) 76
+MOD (296) 77
+POWER (297) 79
+AND (298) 61
+OR (299) 60
+NOT (300) 81
+XOR (301) 62
+LT (302) 67
+GT (303) 68
+LE (304) 69
+GE (305) 70
+EQ (306) 64
+NEQ (307) 65
+ASSIGN (308) 18 19 59
+LBRACE (309) 3 22 37 43
+RBRACE (310) 3 22 37 43
+LPAREN (311) 33 34 35 36 37 52 84 91 92
+RPAREN (312) 33 34 35 36 37 52 84 91 92
+DOT (313) 7 13 14 15 16 17 18 19 20 21 25 26 42 85
+COMMA (314) 53 93
+COLON (315) 40 41 52
+INT_LITERAL (316) 25 26 40 42 88
+FLOAT_LITERAL (317) 89
+IDENTIFIER (318) 2 17 18 19 20 21 22 43 44 52 56 85 86 91
+STRING_LITERAL (319) 90
+LOWER_THAN_ELSE (320)
+
+
+Nonterminals, with rules where they appear
+
+$accept (66)
+    on left: 0
+program (67)
+    on left: 1, on right: 0
+mission_block (68)
+    on left: 2, on right: 1
+block (69)
+    on left: 3, on right: 2 33 34 35 36 52
+statement_list (70)
+    on left: 4 5, on right: 3 4 40 41
+statement (71)
+    on left: 6 7 8 9 10 11 12 13 14 15 16, on right: 4
+declaration (72)
+    on left: 17 18 19 20 21 22, on right: 6 48 49 50
+mode_body (73)
+    on left: 23 24, on right: 22 23
+mode_entry (74)
+    on left: 25 26, on right: 23
+type (75)
+    on left: 27 28 29 30 31 32, on right: 17 18 19 20 21 52 56
+control_statement (76)
+    on left: 33 34 35, on right: 8
+loop_statement (77)
+    on left: 36, on right: 9
+switch_statement (78)
+    on left: 37, on right: 10
+case_list (79)
+    on left: 38 39, on right: 37 38
+case_entry (80)
+    on left: 40 41, on right: 38
+wait_statement (81)
+    on left: 42, on right: 12
+module_definition (82)
+    on left: 43, on right: 11
+inheritance (83)
+    on left: 44 45, on right: 43
+class_body (84)
+    on left: 46 47, on right: 43 46
+class_member (85)
+    on left: 48 49 50 51, on right: 46
+function_definition (86)
+    on left: 52, on right: 51
+parameter_list (87)
+    on left: 53 54 55, on right: 52 53
+parameter (88)
+    on left: 56, on right: 53 54
+expression (89)
+    on left: 57, on right: 7 18 19 33 34 35 36 37 92 93 94
+assignment_expression (90)
+    on left: 58 59, on right: 57 59
+logical_expression (91)
+    on left: 60 61 62 63, on right: 58 59 60 61 62
+equality_expression (92)
+    on left: 64 65 66, on right: 60 61 62 63 64 65
+relational_expression (93)
+    on left: 67 68 69 70 71, on right: 64 65 66 67 68 69 70
+additive_expression (94)
+    on left: 72 73 74, on right: 67 68 69 70 71 72 73
+multiplicative_expression (95)
+    on left: 75 76 77 78, on right: 72 73 74 75 76 77
+power_expression (96)
+    on left: 79 80, on right: 75 76 77 78 79
+unary_expression (97)
+    on left: 81 82, on right: 79 80 81
+postfix_expression (98)
+    on left: 83 84 85, on right: 82 84 85
+primary_expression (99)
+    on left: 86 87 88 89 90 91 92, on right: 83
+argument_list (100)
+    on left: 93 94 95, on right: 84 93
+
+
+state 0
+
+    0 $accept: . program $end
+
+    MISSION  shift, and go to state 1
+
+    program        go to state 2
+    mission_block  go to state 3
+
+
+state 1
+
+    2 mission_block: MISSION . IDENTIFIER LAUNCH block
+
+    IDENTIFIER  shift, and go to state 4
+
+
+state 2
+
+    0 $accept: program . $end
+
+    $end  shift, and go to state 5
+
+
+state 3
+
+    1 program: mission_block . SUCCESS
+
+    SUCCESS  shift, and go to state 6
+
+
+state 4
+
+    2 mission_block: MISSION IDENTIFIER . LAUNCH block
+
+    LAUNCH  shift, and go to state 7
+
+
+state 5
+
+    0 $accept: program $end .
+
+    $default  accept
+
+
+state 6
+
+    1 program: mission_block SUCCESS .
+
+    $default  reduce using rule 1 (program)
+
+
+state 7
+
+    2 mission_block: MISSION IDENTIFIER LAUNCH . block
+
+    LBRACE  shift, and go to state 8
+
+    block  go to state 9
+
+
+state 8
+
+    3 block: LBRACE . statement_list RBRACE
+
+    $default  reduce using rule 5 (statement_list)
+
+    statement_list  go to state 10
+
+
+state 9
+
+    2 mission_block: MISSION IDENTIFIER LAUNCH block .
+
+    $default  reduce using rule 2 (mission_block)
+
+
+state 10
+
+    3 block: LBRACE statement_list . RBRACE
+    4 statement_list: statement_list . statement
+
+    ABORT           shift, and go to state 11
+    MODULE          shift, and go to state 12
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    TELEMETRY       shift, and go to state 15
+    LIMIT           shift, and go to state 16
+    ALIAS           shift, and go to state 17
+    FLEET           shift, and go to state 18
+    MODE            shift, and go to state 19
+    BACK            shift, and go to state 20
+    VERIFY          shift, and go to state 21
+    ORBIT           shift, and go to state 22
+    SCENARIO        shift, and go to state 23
+    STAGE_SEP       shift, and go to state 24
+    COAST           shift, and go to state 25
+    WAIT            shift, and go to state 26
+    NOT             shift, and go to state 27
+    RBRACE          shift, and go to state 28
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    statement                  go to state 34
+    declaration                go to state 35
+    control_statement          go to state 36
+    loop_statement             go to state 37
+    switch_statement           go to state 38
+    wait_statement             go to state 39
+    module_definition          go to state 40
+    expression                 go to state 41
+    assignment_expression      go to state 42
+    logical_expression         go to state 43
+    equality_expression        go to state 44
+    relational_expression      go to state 45
+    additive_expression        go to state 46
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 11
+
+   16 statement: ABORT . DOT
+
+    DOT  shift, and go to state 52
+
+
+state 12
+
+   43 module_definition: MODULE . IDENTIFIER inheritance LBRACE class_body RBRACE
+
+    IDENTIFIER  shift, and go to state 53
+
+
+state 13
+
+   91 primary_expression: DEPLOY . IDENTIFIER LPAREN RPAREN
+
+    IDENTIFIER  shift, and go to state 54
+
+
+state 14
+
+   87 primary_expression: THIS .
+
+    $default  reduce using rule 87 (primary_expression)
+
+
+state 15
+
+   17 declaration: TELEMETRY . type IDENTIFIER DOT
+   18            | TELEMETRY . type IDENTIFIER ASSIGN expression DOT
+
+    COUNT      shift, and go to state 55
+    REAL       shift, and go to state 56
+    PRECISE    shift, and go to state 57
+    FLAG       shift, and go to state 58
+    SYMBOL     shift, and go to state 59
+    VOIDSPACE  shift, and go to state 60
+
+    type  go to state 61
+
+
+state 16
+
+   19 declaration: LIMIT . type IDENTIFIER ASSIGN expression DOT
+
+    COUNT      shift, and go to state 55
+    REAL       shift, and go to state 56
+    PRECISE    shift, and go to state 57
+    FLAG       shift, and go to state 58
+    SYMBOL     shift, and go to state 59
+    VOIDSPACE  shift, and go to state 60
+
+    type  go to state 62
+
+
+state 17
+
+   20 declaration: ALIAS . type IDENTIFIER DOT
+
+    COUNT      shift, and go to state 55
+    REAL       shift, and go to state 56
+    PRECISE    shift, and go to state 57
+    FLAG       shift, and go to state 58
+    SYMBOL     shift, and go to state 59
+    VOIDSPACE  shift, and go to state 60
+
+    type  go to state 63
+
+
+state 18
+
+   21 declaration: FLEET . type IDENTIFIER DOT
+
+    COUNT      shift, and go to state 55
+    REAL       shift, and go to state 56
+    PRECISE    shift, and go to state 57
+    FLAG       shift, and go to state 58
+    SYMBOL     shift, and go to state 59
+    VOIDSPACE  shift, and go to state 60
+
+    type  go to state 64
+
+
+state 19
+
+   22 declaration: MODE . IDENTIFIER LBRACE mode_body RBRACE
+
+    IDENTIFIER  shift, and go to state 65
+
+
+state 20
+
+   15 statement: BACK . DOT
+
+    DOT  shift, and go to state 66
+
+
+state 21
+
+   33 control_statement: VERIFY . LPAREN expression RPAREN block
+   34                  | VERIFY . LPAREN expression RPAREN block ELSE_VERIFY LPAREN expression RPAREN block
+   35                  | VERIFY . LPAREN expression RPAREN block OTHERWISE block
+
+    LPAREN  shift, and go to state 67
+
+
+state 22
+
+   36 loop_statement: ORBIT . LPAREN expression RPAREN block
+
+    LPAREN  shift, and go to state 68
+
+
+state 23
+
+   37 switch_statement: SCENARIO . LPAREN expression RPAREN LBRACE case_list RBRACE
+
+    LPAREN  shift, and go to state 69
+
+
+state 24
+
+   13 statement: STAGE_SEP . DOT
+
+    DOT  shift, and go to state 70
+
+
+state 25
+
+   14 statement: COAST . DOT
+
+    DOT  shift, and go to state 71
+
+
+state 26
+
+   42 wait_statement: WAIT . INT_LITERAL TICK DOT
+
+    INT_LITERAL  shift, and go to state 72
+
+
+state 27
+
+   81 unary_expression: NOT . unary_expression
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    unary_expression    go to state 73
+    postfix_expression  go to state 50
+    primary_expression  go to state 51
+
+
+state 28
+
+    3 block: LBRACE statement_list RBRACE .
+
+    $default  reduce using rule 3 (block)
+
+
+state 29
+
+   92 primary_expression: LPAREN . expression RPAREN
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    expression                 go to state 74
+    assignment_expression      go to state 42
+    logical_expression         go to state 43
+    equality_expression        go to state 44
+    relational_expression      go to state 45
+    additive_expression        go to state 46
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 30
+
+   88 primary_expression: INT_LITERAL .
+
+    $default  reduce using rule 88 (primary_expression)
+
+
+state 31
+
+   89 primary_expression: FLOAT_LITERAL .
+
+    $default  reduce using rule 89 (primary_expression)
+
+
+state 32
+
+   86 primary_expression: IDENTIFIER .
+
+    $default  reduce using rule 86 (primary_expression)
+
+
+state 33
+
+   90 primary_expression: STRING_LITERAL .
+
+    $default  reduce using rule 90 (primary_expression)
+
+
+state 34
+
+    4 statement_list: statement_list statement .
+
+    $default  reduce using rule 4 (statement_list)
+
+
+state 35
+
+    6 statement: declaration .
+
+    $default  reduce using rule 6 (statement)
+
+
+state 36
+
+    8 statement: control_statement .
+
+    $default  reduce using rule 8 (statement)
+
+
+state 37
+
+    9 statement: loop_statement .
+
+    $default  reduce using rule 9 (statement)
+
+
+state 38
+
+   10 statement: switch_statement .
+
+    $default  reduce using rule 10 (statement)
+
+
+state 39
+
+   12 statement: wait_statement .
+
+    $default  reduce using rule 12 (statement)
+
+
+state 40
+
+   11 statement: module_definition .
+
+    $default  reduce using rule 11 (statement)
+
+
+state 41
+
+    7 statement: expression . DOT
+
+    DOT  shift, and go to state 75
+
+
+state 42
+
+   57 expression: assignment_expression .
+
+    $default  reduce using rule 57 (expression)
+
+
+state 43
+
+   58 assignment_expression: logical_expression .
+   59                      | logical_expression . ASSIGN assignment_expression
+   60 logical_expression: logical_expression . OR equality_expression
+   61                   | logical_expression . AND equality_expression
+   62                   | logical_expression . XOR equality_expression
+
+    AND     shift, and go to state 76
+    OR      shift, and go to state 77
+    XOR     shift, and go to state 78
+    ASSIGN  shift, and go to state 79
+
+    $default  reduce using rule 58 (assignment_expression)
+
+
+state 44
+
+   63 logical_expression: equality_expression .
+   64 equality_expression: equality_expression . EQ relational_expression
+   65                    | equality_expression . NEQ relational_expression
+
+    EQ   shift, and go to state 80
+    NEQ  shift, and go to state 81
+
+    $default  reduce using rule 63 (logical_expression)
+
+
+state 45
+
+   66 equality_expression: relational_expression .
+   67 relational_expression: relational_expression . LT additive_expression
+   68                      | relational_expression . GT additive_expression
+   69                      | relational_expression . LE additive_expression
+   70                      | relational_expression . GE additive_expression
+
+    LT  shift, and go to state 82
+    GT  shift, and go to state 83
+    LE  shift, and go to state 84
+    GE  shift, and go to state 85
+
+    $default  reduce using rule 66 (equality_expression)
+
+
+state 46
+
+   71 relational_expression: additive_expression .
+   72 additive_expression: additive_expression . ADD multiplicative_expression
+   73                    | additive_expression . MINUS multiplicative_expression
+
+    ADD    shift, and go to state 86
+    MINUS  shift, and go to state 87
+
+    $default  reduce using rule 71 (relational_expression)
+
+
+state 47
+
+   74 additive_expression: multiplicative_expression .
+   75 multiplicative_expression: multiplicative_expression . MUL power_expression
+   76                          | multiplicative_expression . DIVIDE power_expression
+   77                          | multiplicative_expression . MOD power_expression
+
+    MUL     shift, and go to state 88
+    DIVIDE  shift, and go to state 89
+    MOD     shift, and go to state 90
+
+    $default  reduce using rule 74 (additive_expression)
+
+
+state 48
+
+   78 multiplicative_expression: power_expression .
+   79 power_expression: power_expression . POWER unary_expression
+
+    POWER  shift, and go to state 91
+
+    $default  reduce using rule 78 (multiplicative_expression)
+
+
+state 49
+
+   80 power_expression: unary_expression .
+
+    $default  reduce using rule 80 (power_expression)
+
+
+state 50
+
+   82 unary_expression: postfix_expression .
+   84 postfix_expression: postfix_expression . LPAREN argument_list RPAREN
+   85                   | postfix_expression . DOT IDENTIFIER
+
+    LPAREN  shift, and go to state 92
+    DOT     shift, and go to state 93
+
+    DOT       [reduce using rule 82 (unary_expression)]
+    $default  reduce using rule 82 (unary_expression)
+
+
+state 51
+
+   83 postfix_expression: primary_expression .
+
+    $default  reduce using rule 83 (postfix_expression)
+
+
+state 52
+
+   16 statement: ABORT DOT .
+
+    $default  reduce using rule 16 (statement)
+
+
+state 53
+
+   43 module_definition: MODULE IDENTIFIER . inheritance LBRACE class_body RBRACE
+
+    EXTENDS  shift, and go to state 94
+
+    $default  reduce using rule 45 (inheritance)
+
+    inheritance  go to state 95
+
+
+state 54
+
+   91 primary_expression: DEPLOY IDENTIFIER . LPAREN RPAREN
+
+    LPAREN  shift, and go to state 96
+
+
+state 55
+
+   27 type: COUNT .
+
+    $default  reduce using rule 27 (type)
+
+
+state 56
+
+   28 type: REAL .
+
+    $default  reduce using rule 28 (type)
+
+
+state 57
+
+   29 type: PRECISE .
+
+    $default  reduce using rule 29 (type)
+
+
+state 58
+
+   30 type: FLAG .
+
+    $default  reduce using rule 30 (type)
+
+
+state 59
+
+   31 type: SYMBOL .
+
+    $default  reduce using rule 31 (type)
+
+
+state 60
+
+   32 type: VOIDSPACE .
+
+    $default  reduce using rule 32 (type)
+
+
+state 61
+
+   17 declaration: TELEMETRY type . IDENTIFIER DOT
+   18            | TELEMETRY type . IDENTIFIER ASSIGN expression DOT
+
+    IDENTIFIER  shift, and go to state 97
+
+
+state 62
+
+   19 declaration: LIMIT type . IDENTIFIER ASSIGN expression DOT
+
+    IDENTIFIER  shift, and go to state 98
+
+
+state 63
+
+   20 declaration: ALIAS type . IDENTIFIER DOT
+
+    IDENTIFIER  shift, and go to state 99
+
+
+state 64
+
+   21 declaration: FLEET type . IDENTIFIER DOT
+
+    IDENTIFIER  shift, and go to state 100
+
+
+state 65
+
+   22 declaration: MODE IDENTIFIER . LBRACE mode_body RBRACE
+
+    LBRACE  shift, and go to state 101
+
+
+state 66
+
+   15 statement: BACK DOT .
+
+    $default  reduce using rule 15 (statement)
+
+
+state 67
+
+   33 control_statement: VERIFY LPAREN . expression RPAREN block
+   34                  | VERIFY LPAREN . expression RPAREN block ELSE_VERIFY LPAREN expression RPAREN block
+   35                  | VERIFY LPAREN . expression RPAREN block OTHERWISE block
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    expression                 go to state 102
+    assignment_expression      go to state 42
+    logical_expression         go to state 43
+    equality_expression        go to state 44
+    relational_expression      go to state 45
+    additive_expression        go to state 46
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 68
+
+   36 loop_statement: ORBIT LPAREN . expression RPAREN block
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    expression                 go to state 103
+    assignment_expression      go to state 42
+    logical_expression         go to state 43
+    equality_expression        go to state 44
+    relational_expression      go to state 45
+    additive_expression        go to state 46
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 69
+
+   37 switch_statement: SCENARIO LPAREN . expression RPAREN LBRACE case_list RBRACE
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    expression                 go to state 104
+    assignment_expression      go to state 42
+    logical_expression         go to state 43
+    equality_expression        go to state 44
+    relational_expression      go to state 45
+    additive_expression        go to state 46
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 70
+
+   13 statement: STAGE_SEP DOT .
+
+    $default  reduce using rule 13 (statement)
+
+
+state 71
+
+   14 statement: COAST DOT .
+
+    $default  reduce using rule 14 (statement)
+
+
+state 72
+
+   42 wait_statement: WAIT INT_LITERAL . TICK DOT
+
+    TICK  shift, and go to state 105
+
+
+state 73
+
+   81 unary_expression: NOT unary_expression .
+
+    $default  reduce using rule 81 (unary_expression)
+
+
+state 74
+
+   92 primary_expression: LPAREN expression . RPAREN
+
+    RPAREN  shift, and go to state 106
+
+
+state 75
+
+    7 statement: expression DOT .
+
+    $default  reduce using rule 7 (statement)
+
+
+state 76
+
+   61 logical_expression: logical_expression AND . equality_expression
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    equality_expression        go to state 107
+    relational_expression      go to state 45
+    additive_expression        go to state 46
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 77
+
+   60 logical_expression: logical_expression OR . equality_expression
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    equality_expression        go to state 108
+    relational_expression      go to state 45
+    additive_expression        go to state 46
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 78
+
+   62 logical_expression: logical_expression XOR . equality_expression
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    equality_expression        go to state 109
+    relational_expression      go to state 45
+    additive_expression        go to state 46
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 79
+
+   59 assignment_expression: logical_expression ASSIGN . assignment_expression
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    assignment_expression      go to state 110
+    logical_expression         go to state 43
+    equality_expression        go to state 44
+    relational_expression      go to state 45
+    additive_expression        go to state 46
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 80
+
+   64 equality_expression: equality_expression EQ . relational_expression
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    relational_expression      go to state 111
+    additive_expression        go to state 46
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 81
+
+   65 equality_expression: equality_expression NEQ . relational_expression
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    relational_expression      go to state 112
+    additive_expression        go to state 46
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 82
+
+   67 relational_expression: relational_expression LT . additive_expression
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    additive_expression        go to state 113
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 83
+
+   68 relational_expression: relational_expression GT . additive_expression
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    additive_expression        go to state 114
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 84
+
+   69 relational_expression: relational_expression LE . additive_expression
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    additive_expression        go to state 115
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 85
+
+   70 relational_expression: relational_expression GE . additive_expression
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    additive_expression        go to state 116
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 86
+
+   72 additive_expression: additive_expression ADD . multiplicative_expression
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    multiplicative_expression  go to state 117
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 87
+
+   73 additive_expression: additive_expression MINUS . multiplicative_expression
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    multiplicative_expression  go to state 118
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 88
+
+   75 multiplicative_expression: multiplicative_expression MUL . power_expression
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    power_expression    go to state 119
+    unary_expression    go to state 49
+    postfix_expression  go to state 50
+    primary_expression  go to state 51
+
+
+state 89
+
+   76 multiplicative_expression: multiplicative_expression DIVIDE . power_expression
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    power_expression    go to state 120
+    unary_expression    go to state 49
+    postfix_expression  go to state 50
+    primary_expression  go to state 51
+
+
+state 90
+
+   77 multiplicative_expression: multiplicative_expression MOD . power_expression
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    power_expression    go to state 121
+    unary_expression    go to state 49
+    postfix_expression  go to state 50
+    primary_expression  go to state 51
+
+
+state 91
+
+   79 power_expression: power_expression POWER . unary_expression
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    unary_expression    go to state 122
+    postfix_expression  go to state 50
+    primary_expression  go to state 51
+
+
+state 92
+
+   84 postfix_expression: postfix_expression LPAREN . argument_list RPAREN
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    $default  reduce using rule 95 (argument_list)
+
+    expression                 go to state 123
+    assignment_expression      go to state 42
+    logical_expression         go to state 43
+    equality_expression        go to state 44
+    relational_expression      go to state 45
+    additive_expression        go to state 46
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+    argument_list              go to state 124
+
+
+state 93
+
+   85 postfix_expression: postfix_expression DOT . IDENTIFIER
+
+    IDENTIFIER  shift, and go to state 125
+
+
+state 94
+
+   44 inheritance: EXTENDS . IDENTIFIER
+
+    IDENTIFIER  shift, and go to state 126
+
+
+state 95
+
+   43 module_definition: MODULE IDENTIFIER inheritance . LBRACE class_body RBRACE
+
+    LBRACE  shift, and go to state 127
+
+
+state 96
+
+   91 primary_expression: DEPLOY IDENTIFIER LPAREN . RPAREN
+
+    RPAREN  shift, and go to state 128
+
+
+state 97
+
+   17 declaration: TELEMETRY type IDENTIFIER . DOT
+   18            | TELEMETRY type IDENTIFIER . ASSIGN expression DOT
+
+    ASSIGN  shift, and go to state 129
+    DOT     shift, and go to state 130
+
+
+state 98
+
+   19 declaration: LIMIT type IDENTIFIER . ASSIGN expression DOT
+
+    ASSIGN  shift, and go to state 131
+
+
+state 99
+
+   20 declaration: ALIAS type IDENTIFIER . DOT
+
+    DOT  shift, and go to state 132
+
+
+state 100
+
+   21 declaration: FLEET type IDENTIFIER . DOT
+
+    DOT  shift, and go to state 133
+
+
+state 101
+
+   22 declaration: MODE IDENTIFIER LBRACE . mode_body RBRACE
+
+    $default  reduce using rule 24 (mode_body)
+
+    mode_body  go to state 134
+
+
+state 102
+
+   33 control_statement: VERIFY LPAREN expression . RPAREN block
+   34                  | VERIFY LPAREN expression . RPAREN block ELSE_VERIFY LPAREN expression RPAREN block
+   35                  | VERIFY LPAREN expression . RPAREN block OTHERWISE block
+
+    RPAREN  shift, and go to state 135
+
+
+state 103
+
+   36 loop_statement: ORBIT LPAREN expression . RPAREN block
+
+    RPAREN  shift, and go to state 136
+
+
+state 104
+
+   37 switch_statement: SCENARIO LPAREN expression . RPAREN LBRACE case_list RBRACE
+
+    RPAREN  shift, and go to state 137
+
+
+state 105
+
+   42 wait_statement: WAIT INT_LITERAL TICK . DOT
+
+    DOT  shift, and go to state 138
+
+
+state 106
+
+   92 primary_expression: LPAREN expression RPAREN .
+
+    $default  reduce using rule 92 (primary_expression)
+
+
+state 107
+
+   61 logical_expression: logical_expression AND equality_expression .
+   64 equality_expression: equality_expression . EQ relational_expression
+   65                    | equality_expression . NEQ relational_expression
+
+    EQ   shift, and go to state 80
+    NEQ  shift, and go to state 81
+
+    $default  reduce using rule 61 (logical_expression)
+
+
+state 108
+
+   60 logical_expression: logical_expression OR equality_expression .
+   64 equality_expression: equality_expression . EQ relational_expression
+   65                    | equality_expression . NEQ relational_expression
+
+    EQ   shift, and go to state 80
+    NEQ  shift, and go to state 81
+
+    $default  reduce using rule 60 (logical_expression)
+
+
+state 109
+
+   62 logical_expression: logical_expression XOR equality_expression .
+   64 equality_expression: equality_expression . EQ relational_expression
+   65                    | equality_expression . NEQ relational_expression
+
+    EQ   shift, and go to state 80
+    NEQ  shift, and go to state 81
+
+    $default  reduce using rule 62 (logical_expression)
+
+
+state 110
+
+   59 assignment_expression: logical_expression ASSIGN assignment_expression .
+
+    $default  reduce using rule 59 (assignment_expression)
+
+
+state 111
+
+   64 equality_expression: equality_expression EQ relational_expression .
+   67 relational_expression: relational_expression . LT additive_expression
+   68                      | relational_expression . GT additive_expression
+   69                      | relational_expression . LE additive_expression
+   70                      | relational_expression . GE additive_expression
+
+    LT  shift, and go to state 82
+    GT  shift, and go to state 83
+    LE  shift, and go to state 84
+    GE  shift, and go to state 85
+
+    $default  reduce using rule 64 (equality_expression)
+
+
+state 112
+
+   65 equality_expression: equality_expression NEQ relational_expression .
+   67 relational_expression: relational_expression . LT additive_expression
+   68                      | relational_expression . GT additive_expression
+   69                      | relational_expression . LE additive_expression
+   70                      | relational_expression . GE additive_expression
+
+    LT  shift, and go to state 82
+    GT  shift, and go to state 83
+    LE  shift, and go to state 84
+    GE  shift, and go to state 85
+
+    $default  reduce using rule 65 (equality_expression)
+
+
+state 113
+
+   67 relational_expression: relational_expression LT additive_expression .
+   72 additive_expression: additive_expression . ADD multiplicative_expression
+   73                    | additive_expression . MINUS multiplicative_expression
+
+    ADD    shift, and go to state 86
+    MINUS  shift, and go to state 87
+
+    $default  reduce using rule 67 (relational_expression)
+
+
+state 114
+
+   68 relational_expression: relational_expression GT additive_expression .
+   72 additive_expression: additive_expression . ADD multiplicative_expression
+   73                    | additive_expression . MINUS multiplicative_expression
+
+    ADD    shift, and go to state 86
+    MINUS  shift, and go to state 87
+
+    $default  reduce using rule 68 (relational_expression)
+
+
+state 115
+
+   69 relational_expression: relational_expression LE additive_expression .
+   72 additive_expression: additive_expression . ADD multiplicative_expression
+   73                    | additive_expression . MINUS multiplicative_expression
+
+    ADD    shift, and go to state 86
+    MINUS  shift, and go to state 87
+
+    $default  reduce using rule 69 (relational_expression)
+
+
+state 116
+
+   70 relational_expression: relational_expression GE additive_expression .
+   72 additive_expression: additive_expression . ADD multiplicative_expression
+   73                    | additive_expression . MINUS multiplicative_expression
+
+    ADD    shift, and go to state 86
+    MINUS  shift, and go to state 87
+
+    $default  reduce using rule 70 (relational_expression)
+
+
+state 117
+
+   72 additive_expression: additive_expression ADD multiplicative_expression .
+   75 multiplicative_expression: multiplicative_expression . MUL power_expression
+   76                          | multiplicative_expression . DIVIDE power_expression
+   77                          | multiplicative_expression . MOD power_expression
+
+    MUL     shift, and go to state 88
+    DIVIDE  shift, and go to state 89
+    MOD     shift, and go to state 90
+
+    $default  reduce using rule 72 (additive_expression)
+
+
+state 118
+
+   73 additive_expression: additive_expression MINUS multiplicative_expression .
+   75 multiplicative_expression: multiplicative_expression . MUL power_expression
+   76                          | multiplicative_expression . DIVIDE power_expression
+   77                          | multiplicative_expression . MOD power_expression
+
+    MUL     shift, and go to state 88
+    DIVIDE  shift, and go to state 89
+    MOD     shift, and go to state 90
+
+    $default  reduce using rule 73 (additive_expression)
+
+
+state 119
+
+   75 multiplicative_expression: multiplicative_expression MUL power_expression .
+   79 power_expression: power_expression . POWER unary_expression
+
+    POWER  shift, and go to state 91
+
+    $default  reduce using rule 75 (multiplicative_expression)
+
+
+state 120
+
+   76 multiplicative_expression: multiplicative_expression DIVIDE power_expression .
+   79 power_expression: power_expression . POWER unary_expression
+
+    POWER  shift, and go to state 91
+
+    $default  reduce using rule 76 (multiplicative_expression)
+
+
+state 121
+
+   77 multiplicative_expression: multiplicative_expression MOD power_expression .
+   79 power_expression: power_expression . POWER unary_expression
+
+    POWER  shift, and go to state 91
+
+    $default  reduce using rule 77 (multiplicative_expression)
+
+
+state 122
+
+   79 power_expression: power_expression POWER unary_expression .
+
+    $default  reduce using rule 79 (power_expression)
+
+
+state 123
+
+   94 argument_list: expression .
+
+    $default  reduce using rule 94 (argument_list)
+
+
+state 124
+
+   84 postfix_expression: postfix_expression LPAREN argument_list . RPAREN
+   93 argument_list: argument_list . COMMA expression
+
+    RPAREN  shift, and go to state 139
+    COMMA   shift, and go to state 140
+
+
+state 125
+
+   85 postfix_expression: postfix_expression DOT IDENTIFIER .
+
+    $default  reduce using rule 85 (postfix_expression)
+
+
+state 126
+
+   44 inheritance: EXTENDS IDENTIFIER .
+
+    $default  reduce using rule 44 (inheritance)
+
+
+state 127
+
+   43 module_definition: MODULE IDENTIFIER inheritance LBRACE . class_body RBRACE
+
+    $default  reduce using rule 47 (class_body)
+
+    class_body  go to state 141
+
+
+state 128
+
+   91 primary_expression: DEPLOY IDENTIFIER LPAREN RPAREN .
+
+    $default  reduce using rule 91 (primary_expression)
+
+
+state 129
+
+   18 declaration: TELEMETRY type IDENTIFIER ASSIGN . expression DOT
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    expression                 go to state 142
+    assignment_expression      go to state 42
+    logical_expression         go to state 43
+    equality_expression        go to state 44
+    relational_expression      go to state 45
+    additive_expression        go to state 46
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 130
+
+   17 declaration: TELEMETRY type IDENTIFIER DOT .
+
+    $default  reduce using rule 17 (declaration)
+
+
+state 131
+
+   19 declaration: LIMIT type IDENTIFIER ASSIGN . expression DOT
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    expression                 go to state 143
+    assignment_expression      go to state 42
+    logical_expression         go to state 43
+    equality_expression        go to state 44
+    relational_expression      go to state 45
+    additive_expression        go to state 46
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 132
+
+   20 declaration: ALIAS type IDENTIFIER DOT .
+
+    $default  reduce using rule 20 (declaration)
+
+
+state 133
+
+   21 declaration: FLEET type IDENTIFIER DOT .
+
+    $default  reduce using rule 21 (declaration)
+
+
+state 134
+
+   22 declaration: MODE IDENTIFIER LBRACE mode_body . RBRACE
+   23 mode_body: mode_body . mode_entry
+
+    TRAJECTORY  shift, and go to state 144
+    FALLBACK    shift, and go to state 145
+    RBRACE      shift, and go to state 146
+
+    mode_entry  go to state 147
+
+
+state 135
+
+   33 control_statement: VERIFY LPAREN expression RPAREN . block
+   34                  | VERIFY LPAREN expression RPAREN . block ELSE_VERIFY LPAREN expression RPAREN block
+   35                  | VERIFY LPAREN expression RPAREN . block OTHERWISE block
+
+    LBRACE  shift, and go to state 8
+
+    block  go to state 148
+
+
+state 136
+
+   36 loop_statement: ORBIT LPAREN expression RPAREN . block
+
+    LBRACE  shift, and go to state 8
+
+    block  go to state 149
+
+
+state 137
+
+   37 switch_statement: SCENARIO LPAREN expression RPAREN . LBRACE case_list RBRACE
+
+    LBRACE  shift, and go to state 150
+
+
+state 138
+
+   42 wait_statement: WAIT INT_LITERAL TICK DOT .
+
+    $default  reduce using rule 42 (wait_statement)
+
+
+state 139
+
+   84 postfix_expression: postfix_expression LPAREN argument_list RPAREN .
+
+    $default  reduce using rule 84 (postfix_expression)
+
+
+state 140
+
+   93 argument_list: argument_list COMMA . expression
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    expression                 go to state 151
+    assignment_expression      go to state 42
+    logical_expression         go to state 43
+    equality_expression        go to state 44
+    relational_expression      go to state 45
+    additive_expression        go to state 46
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 141
+
+   43 module_definition: MODULE IDENTIFIER inheritance LBRACE class_body . RBRACE
+   46 class_body: class_body . class_member
+
+    PUBLIC     shift, and go to state 152
+    PRIVATE    shift, and go to state 153
+    TELEMETRY  shift, and go to state 15
+    LIMIT      shift, and go to state 16
+    ALIAS      shift, and go to state 17
+    FLEET      shift, and go to state 18
+    MODE       shift, and go to state 19
+    COMMAND    shift, and go to state 154
+    RBRACE     shift, and go to state 155
+
+    declaration          go to state 156
+    class_member         go to state 157
+    function_definition  go to state 158
+
+
+state 142
+
+   18 declaration: TELEMETRY type IDENTIFIER ASSIGN expression . DOT
+
+    DOT  shift, and go to state 159
+
+
+state 143
+
+   19 declaration: LIMIT type IDENTIFIER ASSIGN expression . DOT
+
+    DOT  shift, and go to state 160
+
+
+state 144
+
+   25 mode_entry: TRAJECTORY . INT_LITERAL DOT
+
+    INT_LITERAL  shift, and go to state 161
+
+
+state 145
+
+   26 mode_entry: FALLBACK . INT_LITERAL DOT
+
+    INT_LITERAL  shift, and go to state 162
+
+
+state 146
+
+   22 declaration: MODE IDENTIFIER LBRACE mode_body RBRACE .
+
+    $default  reduce using rule 22 (declaration)
+
+
+state 147
+
+   23 mode_body: mode_body mode_entry .
+
+    $default  reduce using rule 23 (mode_body)
+
+
+state 148
+
+   33 control_statement: VERIFY LPAREN expression RPAREN block .
+   34                  | VERIFY LPAREN expression RPAREN block . ELSE_VERIFY LPAREN expression RPAREN block
+   35                  | VERIFY LPAREN expression RPAREN block . OTHERWISE block
+
+    ELSE_VERIFY  shift, and go to state 163
+    OTHERWISE    shift, and go to state 164
+
+    $default  reduce using rule 33 (control_statement)
+
+
+state 149
+
+   36 loop_statement: ORBIT LPAREN expression RPAREN block .
+
+    $default  reduce using rule 36 (loop_statement)
+
+
+state 150
+
+   37 switch_statement: SCENARIO LPAREN expression RPAREN LBRACE . case_list RBRACE
+
+    $default  reduce using rule 39 (case_list)
+
+    case_list  go to state 165
+
+
+state 151
+
+   93 argument_list: argument_list COMMA expression .
+
+    $default  reduce using rule 93 (argument_list)
+
+
+state 152
+
+   49 class_member: PUBLIC . declaration
+
+    TELEMETRY  shift, and go to state 15
+    LIMIT      shift, and go to state 16
+    ALIAS      shift, and go to state 17
+    FLEET      shift, and go to state 18
+    MODE       shift, and go to state 19
+
+    declaration  go to state 166
+
+
+state 153
+
+   50 class_member: PRIVATE . declaration
+
+    TELEMETRY  shift, and go to state 15
+    LIMIT      shift, and go to state 16
+    ALIAS      shift, and go to state 17
+    FLEET      shift, and go to state 18
+    MODE       shift, and go to state 19
+
+    declaration  go to state 167
+
+
+state 154
+
+   52 function_definition: COMMAND . IDENTIFIER LPAREN parameter_list RPAREN COLON type block
+
+    IDENTIFIER  shift, and go to state 168
+
+
+state 155
+
+   43 module_definition: MODULE IDENTIFIER inheritance LBRACE class_body RBRACE .
+
+    $default  reduce using rule 43 (module_definition)
+
+
+state 156
+
+   48 class_member: declaration .
+
+    $default  reduce using rule 48 (class_member)
+
+
+state 157
+
+   46 class_body: class_body class_member .
+
+    $default  reduce using rule 46 (class_body)
+
+
+state 158
+
+   51 class_member: function_definition .
+
+    $default  reduce using rule 51 (class_member)
+
+
+state 159
+
+   18 declaration: TELEMETRY type IDENTIFIER ASSIGN expression DOT .
+
+    $default  reduce using rule 18 (declaration)
+
+
+state 160
+
+   19 declaration: LIMIT type IDENTIFIER ASSIGN expression DOT .
+
+    $default  reduce using rule 19 (declaration)
+
+
+state 161
+
+   25 mode_entry: TRAJECTORY INT_LITERAL . DOT
+
+    DOT  shift, and go to state 169
+
+
+state 162
+
+   26 mode_entry: FALLBACK INT_LITERAL . DOT
+
+    DOT  shift, and go to state 170
+
+
+state 163
+
+   34 control_statement: VERIFY LPAREN expression RPAREN block ELSE_VERIFY . LPAREN expression RPAREN block
+
+    LPAREN  shift, and go to state 171
+
+
+state 164
+
+   35 control_statement: VERIFY LPAREN expression RPAREN block OTHERWISE . block
+
+    LBRACE  shift, and go to state 8
+
+    block  go to state 172
+
+
+state 165
+
+   37 switch_statement: SCENARIO LPAREN expression RPAREN LBRACE case_list . RBRACE
+   38 case_list: case_list . case_entry
+
+    TRAJECTORY  shift, and go to state 173
+    FALLBACK    shift, and go to state 174
+    RBRACE      shift, and go to state 175
+
+    case_entry  go to state 176
+
+
+state 166
+
+   49 class_member: PUBLIC declaration .
+
+    $default  reduce using rule 49 (class_member)
+
+
+state 167
+
+   50 class_member: PRIVATE declaration .
+
+    $default  reduce using rule 50 (class_member)
+
+
+state 168
+
+   52 function_definition: COMMAND IDENTIFIER . LPAREN parameter_list RPAREN COLON type block
+
+    LPAREN  shift, and go to state 177
+
+
+state 169
+
+   25 mode_entry: TRAJECTORY INT_LITERAL DOT .
+
+    $default  reduce using rule 25 (mode_entry)
+
+
+state 170
+
+   26 mode_entry: FALLBACK INT_LITERAL DOT .
+
+    $default  reduce using rule 26 (mode_entry)
+
+
+state 171
+
+   34 control_statement: VERIFY LPAREN expression RPAREN block ELSE_VERIFY LPAREN . expression RPAREN block
+
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    expression                 go to state 178
+    assignment_expression      go to state 42
+    logical_expression         go to state 43
+    equality_expression        go to state 44
+    relational_expression      go to state 45
+    additive_expression        go to state 46
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 172
+
+   35 control_statement: VERIFY LPAREN expression RPAREN block OTHERWISE block .
+
+    $default  reduce using rule 35 (control_statement)
+
+
+state 173
+
+   40 case_entry: TRAJECTORY . INT_LITERAL COLON statement_list
+
+    INT_LITERAL  shift, and go to state 179
+
+
+state 174
+
+   41 case_entry: FALLBACK . COLON statement_list
+
+    COLON  shift, and go to state 180
+
+
+state 175
+
+   37 switch_statement: SCENARIO LPAREN expression RPAREN LBRACE case_list RBRACE .
+
+    $default  reduce using rule 37 (switch_statement)
+
+
+state 176
+
+   38 case_list: case_list case_entry .
+
+    $default  reduce using rule 38 (case_list)
+
+
+state 177
+
+   52 function_definition: COMMAND IDENTIFIER LPAREN . parameter_list RPAREN COLON type block
+
+    COUNT      shift, and go to state 55
+    REAL       shift, and go to state 56
+    PRECISE    shift, and go to state 57
+    FLAG       shift, and go to state 58
+    SYMBOL     shift, and go to state 59
+    VOIDSPACE  shift, and go to state 60
+
+    $default  reduce using rule 55 (parameter_list)
+
+    type            go to state 181
+    parameter_list  go to state 182
+    parameter       go to state 183
+
+
+state 178
+
+   34 control_statement: VERIFY LPAREN expression RPAREN block ELSE_VERIFY LPAREN expression . RPAREN block
+
+    RPAREN  shift, and go to state 184
+
+
+state 179
+
+   40 case_entry: TRAJECTORY INT_LITERAL . COLON statement_list
+
+    COLON  shift, and go to state 185
+
+
+state 180
+
+   41 case_entry: FALLBACK COLON . statement_list
+
+    $default  reduce using rule 5 (statement_list)
+
+    statement_list  go to state 186
+
+
+state 181
+
+   56 parameter: type . IDENTIFIER
+
+    IDENTIFIER  shift, and go to state 187
+
+
+state 182
+
+   52 function_definition: COMMAND IDENTIFIER LPAREN parameter_list . RPAREN COLON type block
+   53 parameter_list: parameter_list . COMMA parameter
+
+    RPAREN  shift, and go to state 188
+    COMMA   shift, and go to state 189
+
+
+state 183
+
+   54 parameter_list: parameter .
+
+    $default  reduce using rule 54 (parameter_list)
+
+
+state 184
+
+   34 control_statement: VERIFY LPAREN expression RPAREN block ELSE_VERIFY LPAREN expression RPAREN . block
+
+    LBRACE  shift, and go to state 8
+
+    block  go to state 190
+
+
+state 185
+
+   40 case_entry: TRAJECTORY INT_LITERAL COLON . statement_list
+
+    $default  reduce using rule 5 (statement_list)
+
+    statement_list  go to state 191
+
+
+state 186
+
+    4 statement_list: statement_list . statement
+   41 case_entry: FALLBACK COLON statement_list .
+
+    ABORT           shift, and go to state 11
+    MODULE          shift, and go to state 12
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    TELEMETRY       shift, and go to state 15
+    LIMIT           shift, and go to state 16
+    ALIAS           shift, and go to state 17
+    FLEET           shift, and go to state 18
+    MODE            shift, and go to state 19
+    BACK            shift, and go to state 20
+    VERIFY          shift, and go to state 21
+    ORBIT           shift, and go to state 22
+    SCENARIO        shift, and go to state 23
+    STAGE_SEP       shift, and go to state 24
+    COAST           shift, and go to state 25
+    WAIT            shift, and go to state 26
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    $default  reduce using rule 41 (case_entry)
+
+    statement                  go to state 34
+    declaration                go to state 35
+    control_statement          go to state 36
+    loop_statement             go to state 37
+    switch_statement           go to state 38
+    wait_statement             go to state 39
+    module_definition          go to state 40
+    expression                 go to state 41
+    assignment_expression      go to state 42
+    logical_expression         go to state 43
+    equality_expression        go to state 44
+    relational_expression      go to state 45
+    additive_expression        go to state 46
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 187
+
+   56 parameter: type IDENTIFIER .
+
+    $default  reduce using rule 56 (parameter)
+
+
+state 188
+
+   52 function_definition: COMMAND IDENTIFIER LPAREN parameter_list RPAREN . COLON type block
+
+    COLON  shift, and go to state 192
+
+
+state 189
+
+   53 parameter_list: parameter_list COMMA . parameter
+
+    COUNT      shift, and go to state 55
+    REAL       shift, and go to state 56
+    PRECISE    shift, and go to state 57
+    FLAG       shift, and go to state 58
+    SYMBOL     shift, and go to state 59
+    VOIDSPACE  shift, and go to state 60
+
+    type       go to state 181
+    parameter  go to state 193
+
+
+state 190
+
+   34 control_statement: VERIFY LPAREN expression RPAREN block ELSE_VERIFY LPAREN expression RPAREN block .
+
+    $default  reduce using rule 34 (control_statement)
+
+
+state 191
+
+    4 statement_list: statement_list . statement
+   40 case_entry: TRAJECTORY INT_LITERAL COLON statement_list .
+
+    ABORT           shift, and go to state 11
+    MODULE          shift, and go to state 12
+    DEPLOY          shift, and go to state 13
+    THIS            shift, and go to state 14
+    TELEMETRY       shift, and go to state 15
+    LIMIT           shift, and go to state 16
+    ALIAS           shift, and go to state 17
+    FLEET           shift, and go to state 18
+    MODE            shift, and go to state 19
+    BACK            shift, and go to state 20
+    VERIFY          shift, and go to state 21
+    ORBIT           shift, and go to state 22
+    SCENARIO        shift, and go to state 23
+    STAGE_SEP       shift, and go to state 24
+    COAST           shift, and go to state 25
+    WAIT            shift, and go to state 26
+    NOT             shift, and go to state 27
+    LPAREN          shift, and go to state 29
+    INT_LITERAL     shift, and go to state 30
+    FLOAT_LITERAL   shift, and go to state 31
+    IDENTIFIER      shift, and go to state 32
+    STRING_LITERAL  shift, and go to state 33
+
+    $default  reduce using rule 40 (case_entry)
+
+    statement                  go to state 34
+    declaration                go to state 35
+    control_statement          go to state 36
+    loop_statement             go to state 37
+    switch_statement           go to state 38
+    wait_statement             go to state 39
+    module_definition          go to state 40
+    expression                 go to state 41
+    assignment_expression      go to state 42
+    logical_expression         go to state 43
+    equality_expression        go to state 44
+    relational_expression      go to state 45
+    additive_expression        go to state 46
+    multiplicative_expression  go to state 47
+    power_expression           go to state 48
+    unary_expression           go to state 49
+    postfix_expression         go to state 50
+    primary_expression         go to state 51
+
+
+state 192
+
+   52 function_definition: COMMAND IDENTIFIER LPAREN parameter_list RPAREN COLON . type block
+
+    COUNT      shift, and go to state 55
+    REAL       shift, and go to state 56
+    PRECISE    shift, and go to state 57
+    FLAG       shift, and go to state 58
+    SYMBOL     shift, and go to state 59
+    VOIDSPACE  shift, and go to state 60
+
+    type  go to state 194
+
+
+state 193
+
+   53 parameter_list: parameter_list COMMA parameter .
+
+    $default  reduce using rule 53 (parameter_list)
+
+
+state 194
+
+   52 function_definition: COMMAND IDENTIFIER LPAREN parameter_list RPAREN COLON type . block
+
+    LBRACE  shift, and go to state 8
+
+    block  go to state 195
+
+
+state 195
+
+   52 function_definition: COMMAND IDENTIFIER LPAREN parameter_list RPAREN COLON type block .
+
+    $default  reduce using rule 52 (function_definition)
