@@ -7,6 +7,10 @@
 #include <string.h>
 #include "parser.tab.h"
 
+#ifdef __cplusplus
+#define register
+#endif
+
 extern YYSTYPE yylval;
 %}
 
@@ -82,9 +86,13 @@ STRING_LITERAL  \"([^\"\n])*\"
 "voidspace"        { return VOIDSPACE; }
 
 "add"              { return ADD; }
+"+"                { return ADD; }
 "minus"            { return MINUS; }
+"-"                { return MINUS; }
 "mul"              { return MUL; }
+"*"                { return MUL; }
 "divide"           { return DIVIDE; }
+"/"                { return DIVIDE; }
 "mod"              { return MOD; }
 "**"               { return POWER; }
 
