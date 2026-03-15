@@ -1,152 +1,182 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import Editor from "@monaco-editor/react";
-import Link from "next/link";
+import { type CSSProperties, useCallback, useMemo, useRef, useState } from "react";
+import { CodeEditorPanel } from "@/components/playground/CodeEditorPanel";
+import { EditorDivider } from "@/components/playground/EditorDivider";
+import { OutputPanel } from "@/components/playground/OutputPanel";
+import { PlaygroundNavbar } from "@/components/playground/PlaygroundNavbar";
+import { PlaygroundSidebar } from "@/components/playground/PlaygroundSidebar";
+import { PlaygroundToolbar } from "@/components/playground/PlaygroundToolbar";
+import { StatusBar } from "@/components/playground/StatusBar";
 
-const DEFAULT_CODE = `mission HelloWorld launch {
-    telemetry count x.
-    telemetry count y.
-    telemetry count sum.
-
-    x := 5.
-    y := 3.
-    sum := x add y.
-
-    transmit x.
-    transmit y.
-    transmit sum.
-
-    verify (sum > 5) {
-        transmit 888.
-    } otherwise {
-        transmit 0.
-    }
-} success
-`;
-
-type Tab = "output" | "tokens" | "ir" | "errors";
+type PlaygroundTab = "output" | "tokens" | "ir" | "errors";
 
 export default function PlaygroundPage() {
-  const [code, setCode] = useState(DEFAULT_CODE);
-  const [activeTab, setActiveTab] = useState<Tab>("output");
-  const [output, setOutput] = useState("");
-  const [errors, setErrors] = useState("");
-  const [ir, setIr] = useState("");
-  const [isRunning, setIsRunning] = useState(false);
+  const [activeTab, setActiveTab] = useState<PlaygroundTab>("output");
+  const [split, setSplit] = useState(62);
+  const [editorResetKey, setEditorResetKey] = useState(0);
+  const splitContainerRef = useRef<HTMLDivElement>(null);
 
-  const handleRun = useCallback(async () => {
-    setIsRunning(true);
-    setOutput("");
-    setErrors("");
-    setIr("");
+  const handleRun = useCallback(() => {
+    setActiveTab("output");
+  }, []);
 
-    try {
-      const response = await fetch("/api/compile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
-      });
+  const handleClear = useCallback(() => {
+    setEditorResetKey((value) => value + 1);
+  }, []);
 
-      const data = await response.json();
+  const handleDividerMouseDown = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
 
-      if (data.error) {
-        setErrors(data.error);
-        setActiveTab("errors");
-      } else {
-        setOutput(data.output ?? "");
-        setIr(data.ir ?? "");
-        setActiveTab("output");
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const host = splitContainerRef.current;
+      if (!host) {
+        return;
       }
-    } catch (err) {
-      setErrors(err instanceof Error ? err.message : "Failed to compile");
-      setActiveTab("errors");
-    } finally {
-      setIsRunning(false);
-    }
-  }, [code]);
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "output", label: "Output" },
-    { id: "tokens", label: "Tokens" },
-    { id: "ir", label: "Intermediate Code" },
-    { id: "errors", label: "Errors" },
-  ];
+      const rect = host.getBoundingClientRect();
+      const nextSplit = ((moveEvent.clientX - rect.left) / rect.width) * 100;
+      setSplit(Math.min(75, Math.max(35, nextSplit)));
+    };
 
-  const getTabContent = (tab: Tab) => {
-    switch (tab) {
-      case "output":
-        return output || "Run your code to see output.";
-      case "tokens":
-        return "Token output will be available in a future version.";
-      case "ir":
-        return ir || "Run your code to see intermediate code.";
-      case "errors":
-        return errors || "No errors.";
-    }
-  };
+    const onMouseUp = () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }, []);
+
+  const codeLines = useMemo(
+    () => [
+      {
+        number: 1,
+        content: (
+          <>
+            <span className="text-[#b47eff]">mission</span> <span className="text-[#84a9ff]">Apollo11</span> {"{"}
+          </>
+        ),
+      },
+      {
+        number: 2,
+        content: <span className="text-[#646d92]">    {"// Initialize propulsion systems"}</span>,
+      },
+      {
+        number: 3,
+        content: (
+          <>
+            <span className="text-[#b47eff]">    variable</span> <span className="text-[#84a9ff]">thrust</span> = <span className="text-[#f2aa5f]">100.0</span>;
+          </>
+        ),
+      },
+      {
+        number: 4,
+        content: (
+          <>
+            <span className="text-[#b47eff]">    variable</span> <span className="text-[#84a9ff]">target</span> = <span className="text-[#7de894]">&quot;Moon&quot;</span>;
+          </>
+        ),
+      },
+      { number: 5, content: <span> </span> },
+      {
+        number: 6,
+        content: (
+          <>
+            <span className="text-[#b47eff]">    launch</span> <span className="text-[#f5de67]">sequence</span>() {" {"}
+          </>
+        ),
+      },
+      {
+        number: 7,
+        content: (
+          <>
+            <span className="text-[#7ad3ff]">        log</span>(<span className="text-[#7de894]">&quot;Ignition start...&quot;</span>);
+          </>
+        ),
+      },
+      {
+        number: 8,
+        content: (
+          <>
+            <span className="text-[#b47eff]">        if</span> (thrust &gt; <span className="text-[#f2aa5f]">0</span>) {" {"}
+          </>
+        ),
+      },
+      {
+        number: 9,
+        content: (
+          <>
+            <span className="text-[#7ad3ff]">            execute</span> propulsion.start();
+          </>
+        ),
+      },
+      { number: 10, content: <span>        {"}"}</span> },
+      { number: 11, content: <span>    {"}"}</span> },
+      { number: 12, content: <span>{"}"}</span> },
+      { number: 13, content: <span> </span> },
+      {
+        number: 14,
+        content: (
+          <>
+            <span className="text-[#b47eff]">mission</span> <span className="text-[#84a9ff]">HelloGalaxy</span> {"{"}
+          </>
+        ),
+      },
+      {
+        number: 15,
+        content: (
+          <>
+            <span className="text-[#b47eff]">    launch</span> <span className="text-[#f5de67]">main</span>() {" {"}
+          </>
+        ),
+      },
+      {
+        number: 16,
+        content: (
+          <>
+            <span className="text-[#7ad3ff]">        log</span>(<span className="text-[#7de894]">&quot;Hello Galaxy! Ready for orbit.&quot;</span>);
+          </>
+        ),
+      },
+      { number: 17, content: <span>    {"}"}</span> },
+      { number: 18, content: <span>{"}"}</span> },
+    ],
+    [],
+  );
 
   return (
-    <div className="flex h-screen flex-col bg-gray-950 text-white">
-      <nav className="flex items-center justify-between border-b border-gray-800 px-6 py-3">
-        <Link href="/" className="text-lg font-bold tracking-tight">
-          AstroScript
-        </Link>
-        <div className="flex items-center gap-4">
-          <Link href="/docs" className="text-sm text-gray-400 hover:text-white transition-colors">
-            Docs
-          </Link>
-          <button
-            onClick={handleRun}
-            disabled={isRunning}
-            className="rounded-md bg-green-600 px-4 py-1.5 text-sm font-medium transition-colors hover:bg-green-500 disabled:opacity-50"
-          >
-            {isRunning ? "Running..." : "Run"}
-          </button>
-        </div>
-      </nav>
-
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left: Code Editor */}
-        <div className="flex-1 border-r border-gray-800">
-          <Editor
-            height="100%"
-            defaultLanguage="plaintext"
-            theme="vs-dark"
-            value={code}
-            onChange={(value) => setCode(value ?? "")}
-            options={{
-              fontSize: 14,
-              minimap: { enabled: false },
-              scrollBeyondLastLine: false,
-              padding: { top: 16 },
-              fontFamily: "var(--font-geist-mono), monospace",
-            }}
-          />
-        </div>
-
-        {/* Right: Output Panel */}
-        <div className="flex w-1/2 flex-col">
-          <div className="flex border-b border-gray-800">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 text-sm font-medium transition-colors ${
-                  activeTab === tab.id
-                    ? "border-b-2 border-blue-400 text-blue-400"
-                    : "text-gray-500 hover:text-gray-300"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          <pre className="flex-1 overflow-auto p-4 font-mono text-sm text-gray-300">
-            {getTabContent(activeTab)}
-          </pre>
-        </div>
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#111121] text-[#f6f6f8]">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-24 top-20 h-72 w-72 rounded-full bg-[#2c2ce2]/20 blur-3xl" />
+        <div className="absolute -right-22.5 -top-5 h-80 w-80 rounded-full bg-[#2a3b90]/20 blur-3xl" />
+        <div className="absolute bottom-16 left-1/3 h-56 w-56 rounded-full bg-[#1e275b]/20 blur-3xl" />
       </div>
+
+      <PlaygroundNavbar />
+      <PlaygroundToolbar onRun={handleRun} onClear={handleClear} />
+
+      <main className="relative z-10 flex flex-1 overflow-hidden" aria-label="AstroScript playground workspace">
+        <PlaygroundSidebar />
+
+        <div
+          ref={splitContainerRef}
+          className="flex flex-1 flex-col overflow-hidden md:flex-row"
+          style={{ "--editor-split": `${split}%`, "--output-split": `${100 - split}%` } as CSSProperties}
+        >
+          <div className="w-full md:h-full md:basis-[var(--editor-split)]">
+            <CodeEditorPanel key={editorResetKey} lines={codeLines} />
+          </div>
+
+          <EditorDivider onMouseDown={handleDividerMouseDown} />
+
+          <div className="min-h-0 w-full flex-1 md:h-full md:basis-[var(--output-split)]">
+            <OutputPanel activeTab={activeTab} onChangeTab={setActiveTab} />
+          </div>
+        </div>
+      </main>
+
+      <StatusBar />
     </div>
   );
 }
