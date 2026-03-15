@@ -1,0 +1,33 @@
+# Generated compiler files (Flex/Bison output)
+backend/compiler/build/lex.yy.c
+backend/compiler/build/parser.tab.c
+backend/compiler/build/parser.tab.h
+backend/compiler/build/astroscript
+backend/compiler/build/astroscript.exe
+
+# Legacy generated files
+*.exe
+*.o
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Node / Next.js
+node_modules/
+web/.next/
+web/out/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.local
+.env.production
