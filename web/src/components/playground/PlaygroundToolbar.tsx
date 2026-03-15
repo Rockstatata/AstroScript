@@ -1,9 +1,20 @@
 type PlaygroundToolbarProps = {
   onRun: () => void;
   onClear: () => void;
+  running: boolean;
+  selectedExample: string;
+  examples: Array<{ key: string; label: string }>;
+  onSelectExample: (key: string) => void;
 };
 
-export function PlaygroundToolbar({ onRun, onClear }: PlaygroundToolbarProps) {
+export function PlaygroundToolbar({
+  onRun,
+  onClear,
+  running,
+  selectedExample,
+  examples,
+  onSelectExample,
+}: PlaygroundToolbarProps) {
   return (
     <div className="relative z-10 flex h-12 items-center justify-between border-b border-white/10 bg-[#101124]/95 px-3 text-sm md:px-4">
       <div className="flex items-center gap-2 md:gap-3">
@@ -11,12 +22,13 @@ export function PlaygroundToolbar({ onRun, onClear }: PlaygroundToolbarProps) {
           type="button"
           onClick={onRun}
           aria-label="Run code"
-          className="inline-flex items-center gap-2 rounded-md bg-[#2c2ce2] px-4 py-1.5 font-semibold text-white shadow-[0_0_15px_rgba(44,44,226,0.4)] transition-colors hover:bg-[#3a3ae7]"
+          disabled={running}
+          className="inline-flex items-center gap-2 rounded-md bg-[#2c2ce2] px-4 py-1.5 font-semibold text-white shadow-[0_0_15px_rgba(44,44,226,0.4)] transition-colors hover:bg-[#3a3ae7] disabled:cursor-not-allowed disabled:opacity-70"
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
             <path d="M3 2.5 9 6 3 9.5v-7Z" fill="currentColor" />
           </svg>
-          Run
+          {running ? "Running..." : "Run"}
         </button>
 
         <button
@@ -31,19 +43,24 @@ export function PlaygroundToolbar({ onRun, onClear }: PlaygroundToolbarProps) {
           Clear
         </button>
 
-        <button
-          type="button"
-          aria-label="Example programs"
-          className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-[#bcc0db] transition-colors hover:bg-white/5 hover:text-white"
-        >
+        <label className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-[#bcc0db] transition-colors hover:bg-white/5 hover:text-white">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M4 6h16M4 12h12M4 18h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
-          Example Programs
-          <svg width="10" height="10" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-            <path d="m5 8 5 5 5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
+          <span className="hidden lg:inline">Example Program</span>
+          <select
+            aria-label="Select example program"
+            value={selectedExample}
+            onChange={(event) => onSelectExample(event.target.value)}
+            className="rounded border border-white/15 bg-[#12142e] px-2 py-1 text-xs text-white outline-none"
+          >
+            {examples.map((example) => (
+              <option key={example.key} value={example.key}>
+                {example.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <div className="hidden items-center gap-2 md:flex">

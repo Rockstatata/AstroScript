@@ -28,32 +28,22 @@ export function PlaygroundNavbar() {
           >
             Playground
           </Link>
-          <a href="#" className="transition-colors hover:text-white">
+          <a href="https://discord.com" target="_blank" rel="noreferrer" className="transition-colors hover:text-white">
             Community
           </a>
-          <a href="#" className="transition-colors hover:text-white">
-            Github
+          <a href="https://github.com/Rockstatata/AstroScript" target="_blank" rel="noreferrer" className="transition-colors hover:text-white">
+            GitHub
           </a>
         </nav>
 
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            aria-label="Sign up"
+          <Link
+            href="/"
+            aria-label="Back to landing page"
             className="rounded-md bg-[#2c2ce2] px-4 py-1.5 text-sm font-semibold text-white shadow-[0_0_15px_rgba(44,44,226,0.4)] transition-colors hover:bg-[#3b3be8]"
           >
-            Sign Up
-          </button>
-          <button
-            type="button"
-            aria-label="User profile"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d8ccb9] text-[#665949]"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <circle cx="12" cy="8" r="3" stroke="currentColor" strokeWidth="1.6" />
-              <path d="M6 18c.9-2 2.7-3 6-3s5.1 1 6 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
-          </button>
+            Back Home
+          </Link>
         </div>
       </div>
     </header>

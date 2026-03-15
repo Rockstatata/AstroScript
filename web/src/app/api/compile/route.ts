@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exec } from "child_process";
-import { writeFile, unlink, mkdir } from "fs/promises";
+import { access, mkdir, unlink, writeFile } from "fs/promises";
 import { join } from "path";
 import { randomUUID } from "crypto";
 import { tmpdir } from "os";
@@ -15,6 +15,18 @@ export async function POST(request: NextRequest) {
 
     if (!code || typeof code !== "string") {
       return NextResponse.json({ error: "No code provided" }, { status: 400 });
+    }
+
+    try {
+      await access(COMPILER_PATH);
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            "AstroScript compiler binary is missing. Build backend/compiler first so the playground can execute code.",
+        },
+        { status: 500 },
+      );
     }
 
     const tempDir = join(tmpdir(), "astroscript");
@@ -39,32 +51,42 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Parse output: separate execution output from IR code
     const lines = result.stdout.split("\n");
     const irStart = lines.findIndex((l) => l.includes("--- Optimized Three Address Code ---"));
-    const irEnd = lines.findIndex((l, i) => i > irStart && l.includes("-----------------------------"));
-    const symbolStart = lines.findIndex((l) => l.includes("--- Symbol Table ---"));
+    const irEnd = lines.findIndex(
+      (l, i) => i > irStart && i !== irStart && l.startsWith("---") && l.trim() !== "--- Optimized Three Address Code ---",
+    );
 
     let output = "";
     let ir = "";
+    let tokens = "";
 
-    if (irStart !== -1 && irEnd !== -1) {
-      ir = lines.slice(irStart, irEnd + 1).join("\n");
+    if (irStart !== -1) {
+      const irSliceEnd = irEnd !== -1 ? irEnd : lines.length;
+      ir = lines.slice(irStart, irSliceEnd).join("\n").trim();
     }
 
-    // Execution output is the PRINT lines between IR end and symbol table
     const execLines = lines.filter((l) => l.startsWith("PRINT: "));
     output = execLines.map((l) => l.replace("PRINT: ", "")).join("\n");
+
+    const tokenLines = lines.filter((l) => /\bTOKEN\b|\bLEXICAL\b|\bPARSER\b/i.test(l));
+    tokens = tokenLines.join("\n");
+
+    const stderrText = result.stderr.trim();
+    const stdoutText = result.stdout.trim();
 
     if (result.stderr) {
       return NextResponse.json({
         output,
+        tokens,
         ir,
-        error: result.stderr,
+        stdout: stdoutText,
+        stderr: stderrText,
+        error: stderrText,
       });
     }
 
-    return NextResponse.json({ output, ir });
+    return NextResponse.json({ output, tokens, ir, stdout: stdoutText, stderr: stderrText });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Compilation failed";
     return NextResponse.json({ error: message }, { status: 500 });

@@ -24,6 +24,38 @@ body {
   font-family: var(--font-inter), sans-serif;
 }
 
+.docs-cosmic-bg {
+  background:
+    radial-gradient(950px 560px at 78% -10%, rgb(44 44 226 / 0.2), transparent 60%),
+    radial-gradient(700px 420px at 12% -8%, rgb(23 102 255 / 0.14), transparent 64%),
+    linear-gradient(180deg, #111121 0%, #0f1022 48%, #101126 100%);
+}
+
+.docs-cosmic-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 22%, rgb(255 255 255 / 0.08) 0, transparent 1.5px),
+    radial-gradient(circle at 72% 14%, rgb(255 255 255 / 0.06) 0, transparent 1.2px),
+    radial-gradient(circle at 62% 78%, rgb(255 255 255 / 0.06) 0, transparent 1.4px),
+    radial-gradient(circle at 8% 70%, rgb(255 255 255 / 0.05) 0, transparent 1.2px);
+  background-size: 600px 380px;
+  opacity: 0.5;
+}
+
+.docs-cosmic-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 40%, rgb(44 44 226 / 0.04) 60%, transparent 82%);
+  mix-blend-mode: screen;
+}
+
+* {
+  scrollbar-color: rgb(124 137 255 / 0.4) transparent;
+}
+
 * {
   border-color: rgb(255 255 255 / 0.08);
 }
