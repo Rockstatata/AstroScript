@@ -1,0 +1,470 @@
+{
+  "generatedAt": "2026-03-23T20:27:49.729Z",
+  "keywordSections": [
+    {
+      "title": "Program Structure",
+      "id": "program-structure-keywords",
+      "rows": [
+        {
+          "keyword": "abort",
+          "purpose": "Abort current mission",
+          "equivalent": "exit/fail",
+          "status": "active"
+        },
+        {
+          "keyword": "launch",
+          "purpose": "Starts mission block",
+          "equivalent": "{",
+          "status": "active"
+        },
+        {
+          "keyword": "mission",
+          "purpose": "Program entry point",
+          "equivalent": "main()",
+          "status": "active"
+        },
+        {
+          "keyword": "success",
+          "purpose": "Successful completion marker",
+          "equivalent": "return 0",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "title": "Declarations and Types",
+      "id": "declarations-and-types-keywords",
+      "rows": [
+        {
+          "keyword": "alias",
+          "purpose": "Reserved declaration token",
+          "equivalent": "reserved",
+          "status": "active"
+        },
+        {
+          "keyword": "fleet",
+          "purpose": "Reserved declaration token",
+          "equivalent": "reserved",
+          "status": "active"
+        },
+        {
+          "keyword": "limit",
+          "purpose": "Constant-like declaration",
+          "equivalent": "const",
+          "status": "active"
+        },
+        {
+          "keyword": "mode",
+          "purpose": "Mode declaration",
+          "equivalent": "enum-like",
+          "status": "active"
+        },
+        {
+          "keyword": "telemetry",
+          "purpose": "Variable declaration",
+          "equivalent": "declaration",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "title": "Types",
+      "id": "types-keywords",
+      "rows": [
+        {
+          "keyword": "count",
+          "purpose": "Integer type",
+          "equivalent": "int",
+          "status": "active"
+        },
+        {
+          "keyword": "flag",
+          "purpose": "Boolean type",
+          "equivalent": "bool",
+          "status": "active"
+        },
+        {
+          "keyword": "precise",
+          "purpose": "Double precision number",
+          "equivalent": "double",
+          "status": "active"
+        },
+        {
+          "keyword": "real",
+          "purpose": "Single precision number",
+          "equivalent": "float",
+          "status": "active"
+        },
+        {
+          "keyword": "symbol",
+          "purpose": "String literal type",
+          "equivalent": "string",
+          "status": "active"
+        },
+        {
+          "keyword": "voidspace",
+          "purpose": "Void return type",
+          "equivalent": "void",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "title": "Control Flow",
+      "id": "control-flow-keywords",
+      "rows": [
+        {
+          "keyword": "coast",
+          "purpose": "Reserved control token",
+          "equivalent": "reserved",
+          "status": "active"
+        },
+        {
+          "keyword": "else_verify",
+          "purpose": "Secondary condition",
+          "equivalent": "else if",
+          "status": "active"
+        },
+        {
+          "keyword": "fallback",
+          "purpose": "Default scenario case",
+          "equivalent": "default",
+          "status": "active"
+        },
+        {
+          "keyword": "orbit",
+          "purpose": "Loop entry",
+          "equivalent": "while/for",
+          "status": "active"
+        },
+        {
+          "keyword": "otherwise",
+          "purpose": "Fallback branch",
+          "equivalent": "else",
+          "status": "active"
+        },
+        {
+          "keyword": "scenario",
+          "purpose": "Switch-like branch",
+          "equivalent": "switch",
+          "status": "active"
+        },
+        {
+          "keyword": "stage_sep",
+          "purpose": "Reserved control token",
+          "equivalent": "reserved",
+          "status": "active"
+        },
+        {
+          "keyword": "times",
+          "purpose": "Orbit range form",
+          "equivalent": "for",
+          "status": "active"
+        },
+        {
+          "keyword": "trajectory",
+          "purpose": "Scenario case",
+          "equivalent": "case",
+          "status": "active"
+        },
+        {
+          "keyword": "verify",
+          "purpose": "Conditional branch",
+          "equivalent": "if",
+          "status": "active"
+        },
+        {
+          "keyword": "while",
+          "purpose": "Orbit while form",
+          "equivalent": "while",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "title": "Functions and I/O",
+      "id": "functions-and-i-o-keywords",
+      "rows": [
+        {
+          "keyword": "alarm",
+          "purpose": "Reserved IO token",
+          "equivalent": "reserved",
+          "status": "active"
+        },
+        {
+          "keyword": "back",
+          "purpose": "Return from function",
+          "equivalent": "return",
+          "status": "active"
+        },
+        {
+          "keyword": "broadcast",
+          "purpose": "Reserved IO token",
+          "equivalent": "reserved",
+          "status": "active"
+        },
+        {
+          "keyword": "command",
+          "purpose": "Function declaration",
+          "equivalent": "function",
+          "status": "active"
+        },
+        {
+          "keyword": "receive",
+          "purpose": "Read input",
+          "equivalent": "input",
+          "status": "active"
+        },
+        {
+          "keyword": "transmit",
+          "purpose": "Print value",
+          "equivalent": "print",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "title": "Modules",
+      "id": "modules-keywords",
+      "rows": [
+        {
+          "keyword": "deploy",
+          "purpose": "Reserved module token",
+          "equivalent": "reserved",
+          "status": "active"
+        },
+        {
+          "keyword": "extends",
+          "purpose": "Inheritance token",
+          "equivalent": "extends",
+          "status": "active"
+        },
+        {
+          "keyword": "module",
+          "purpose": "Class-like declaration",
+          "equivalent": "class",
+          "status": "active"
+        },
+        {
+          "keyword": "private",
+          "purpose": "Access modifier",
+          "equivalent": "private",
+          "status": "active"
+        },
+        {
+          "keyword": "public",
+          "purpose": "Access modifier",
+          "equivalent": "public",
+          "status": "active"
+        },
+        {
+          "keyword": "this",
+          "purpose": "Current instance token",
+          "equivalent": "this",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "title": "Built-ins and Runtime",
+      "id": "built-ins-and-runtime-keywords",
+      "rows": [
+        {
+          "keyword": "abs",
+          "purpose": "Math token",
+          "equivalent": "abs",
+          "status": "active"
+        },
+        {
+          "keyword": "acosine",
+          "purpose": "Math token",
+          "equivalent": "acos",
+          "status": "active"
+        },
+        {
+          "keyword": "asine",
+          "purpose": "Math token",
+          "equivalent": "asin",
+          "status": "active"
+        },
+        {
+          "keyword": "atan",
+          "purpose": "Math token",
+          "equivalent": "atan",
+          "status": "active"
+        },
+        {
+          "keyword": "ceil",
+          "purpose": "Math token",
+          "equivalent": "ceil",
+          "status": "active"
+        },
+        {
+          "keyword": "cosine",
+          "purpose": "Math token",
+          "equivalent": "cos",
+          "status": "active"
+        },
+        {
+          "keyword": "flr",
+          "purpose": "Math token",
+          "equivalent": "floor",
+          "status": "active"
+        },
+        {
+          "keyword": "logarithm",
+          "purpose": "Math token",
+          "equivalent": "log",
+          "status": "active"
+        },
+        {
+          "keyword": "prime",
+          "purpose": "Math token",
+          "equivalent": "prime check",
+          "status": "active"
+        },
+        {
+          "keyword": "root",
+          "purpose": "Math token",
+          "equivalent": "sqrt",
+          "status": "active"
+        },
+        {
+          "keyword": "sine",
+          "purpose": "Math token",
+          "equivalent": "sin",
+          "status": "active"
+        },
+        {
+          "keyword": "tan",
+          "purpose": "Math token",
+          "equivalent": "tan",
+          "status": "active"
+        },
+        {
+          "keyword": "tick",
+          "purpose": "Delay unit token",
+          "equivalent": "tick",
+          "status": "active"
+        },
+        {
+          "keyword": "wait",
+          "purpose": "Delay instruction",
+          "equivalent": "sleep",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "title": "Operators",
+      "id": "operators-keywords",
+      "rows": [
+        {
+          "keyword": "add",
+          "purpose": "Addition operator",
+          "equivalent": "+",
+          "status": "active"
+        },
+        {
+          "keyword": "AND",
+          "purpose": "Logical and",
+          "equivalent": "&&",
+          "status": "active"
+        },
+        {
+          "keyword": "divide",
+          "purpose": "Division operator",
+          "equivalent": "/",
+          "status": "active"
+        },
+        {
+          "keyword": "minus",
+          "purpose": "Subtraction operator",
+          "equivalent": "-",
+          "status": "active"
+        },
+        {
+          "keyword": "mod",
+          "purpose": "Modulo operator",
+          "equivalent": "%",
+          "status": "active"
+        },
+        {
+          "keyword": "mul",
+          "purpose": "Multiplication operator",
+          "equivalent": "*",
+          "status": "active"
+        },
+        {
+          "keyword": "NOT",
+          "purpose": "Logical not",
+          "equivalent": "!",
+          "status": "active"
+        },
+        {
+          "keyword": "OR",
+          "purpose": "Logical or",
+          "equivalent": "||",
+          "status": "active"
+        },
+        {
+          "keyword": "XOR",
+          "purpose": "Logical xor",
+          "equivalent": "xor",
+          "status": "active"
+        }
+      ]
+    }
+  ],
+  "operators": {
+    "arithmetic": [
+      {
+        "operation": "Addition",
+        "keyword": "add",
+        "symbol": "+"
+      },
+      {
+        "operation": "Subtraction",
+        "keyword": "minus",
+        "symbol": "-"
+      },
+      {
+        "operation": "Multiplication",
+        "keyword": "mul",
+        "symbol": "*"
+      },
+      {
+        "operation": "Division",
+        "keyword": "divide",
+        "symbol": "/"
+      },
+      {
+        "operation": "Modulo",
+        "keyword": "mod",
+        "symbol": ""
+      },
+      {
+        "operation": "Power",
+        "keyword": "-",
+        "symbol": "**"
+      }
+    ],
+    "comparisons": [
+      "<",
+      ">",
+      "<=",
+      ">=",
+      "==",
+      "!="
+    ],
+    "logical": [
+      "AND",
+      "OR",
+      "NOT",
+      "XOR"
+    ]
+  },
+  "notes": {
+    "reservedMeaning": "All lexer keywords are currently covered by parser productions and are active."
+  }
+}
