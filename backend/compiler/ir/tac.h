@@ -25,6 +25,7 @@ public:
     void emit(const std::string& op, const std::string& arg1 = "", const std::string& arg2 = "", const std::string& result = "");
 
     std::string emitBinary(const std::string& op, const std::string& left, const std::string& right);
+    std::string emitUnary(const std::string& op, const std::string& operand);
 
     void emitAssign(const std::string& target, const std::string& source);
     void emitDeclare(const std::string& type, const std::string& name);

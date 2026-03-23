@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
+#include <new>
 #include <sstream>
 
 TACGenerator::TACGenerator() : tempCounter(0), labelCounter(0) {}
@@ -24,6 +25,12 @@ void TACGenerator::emit(const std::string& op, const std::string& arg1, const st
 std::string TACGenerator::emitBinary(const std::string& op, const std::string& left, const std::string& right) {
     std::string temp = newTemp();
     emit(op, left, right, temp);
+    return temp;
+}
+
+std::string TACGenerator::emitUnary(const std::string& op, const std::string& operand) {
+    std::string temp = newTemp();
+    emit(op, operand, "", temp);
     return temp;
 }
 
@@ -221,7 +228,24 @@ TACGenerator::RuntimeValue TACGenerator::evalBinary(const TACInstruction& instru
 
     if (instruction.op == "-") return l - r;
     if (instruction.op == "*") return l * r;
-    if (instruction.op == "/") return (std::fabs(r) < 1e-12) ? 0.0 : l / r;
+    if (instruction.op == "/") {
+        if (std::fabs(r) < 1e-12) {
+            std::cerr << "RUNTIME ERROR: division by zero" << std::endl;
+            return 0.0;
+        }
+        return l / r;
+    }
+    if (instruction.op == "%") {
+        if (std::fabs(r) < 1e-12) {
+            std::cerr << "RUNTIME ERROR: modulo by zero" << std::endl;
+            return 0.0;
+        }
+        return std::fmod(l, r);
+    }
+    if (instruction.op == "**") return std::pow(l, r);
+    if (instruction.op == "AND") return (valueToBool(left) && valueToBool(right)) ? 1.0 : 0.0;
+    if (instruction.op == "OR") return (valueToBool(left) || valueToBool(right)) ? 1.0 : 0.0;
+    if (instruction.op == "XOR") return (valueToBool(left) != valueToBool(right)) ? 1.0 : 0.0;
     if (instruction.op == "<") return (l < r) ? 1.0 : 0.0;
     if (instruction.op == ">") return (l > r) ? 1.0 : 0.0;
     if (instruction.op == "<=") return (l <= r) ? 1.0 : 0.0;
@@ -267,6 +291,8 @@ void TACGenerator::buildExecutionMetadata() {
 void TACGenerator::constantFold() {
     for (auto& instruction : instructions) {
         if (instruction.op != "+" && instruction.op != "-" && instruction.op != "*" && instruction.op != "/" &&
+            instruction.op != "%" && instruction.op != "**" &&
+            instruction.op != "AND" && instruction.op != "OR" && instruction.op != "XOR" &&
             instruction.op != "<" && instruction.op != ">" && instruction.op != "<=" && instruction.op != ">=" &&
             instruction.op != "==" && instruction.op != "!=") {
             continue;
@@ -283,13 +309,97 @@ void TACGenerator::constantFold() {
         if (instruction.op == "+") folded = left + right;
         else if (instruction.op == "-") folded = left - right;
         else if (instruction.op == "*") folded = left * right;
-        else if (instruction.op == "/") folded = (right == 0.0) ? 0.0 : left / right;
+        else if (instruction.op == "/") {
+            if (right == 0.0) {
+                continue;
+            }
+            folded = left / right;
+        }
+        else if (instruction.op == "%") {
+            if (right == 0.0) {
+                continue;
+            }
+            folded = std::fmod(left, right);
+        }
+        else if (instruction.op == "**") folded = std::pow(left, right);
+        else if (instruction.op == "AND") folded = ((std::fabs(left) > 1e-12) && (std::fabs(right) > 1e-12)) ? 1.0 : 0.0;
+        else if (instruction.op == "OR") folded = ((std::fabs(left) > 1e-12) || (std::fabs(right) > 1e-12)) ? 1.0 : 0.0;
+        else if (instruction.op == "XOR") folded = ((std::fabs(left) > 1e-12) != (std::fabs(right) > 1e-12)) ? 1.0 : 0.0;
         else if (instruction.op == "<") folded = (left < right) ? 1.0 : 0.0;
         else if (instruction.op == ">") folded = (left > right) ? 1.0 : 0.0;
         else if (instruction.op == "<=") folded = (left <= right) ? 1.0 : 0.0;
         else if (instruction.op == ">=") folded = (left >= right) ? 1.0 : 0.0;
         else if (instruction.op == "==") folded = (left == right) ? 1.0 : 0.0;
         else if (instruction.op == "!=") folded = (left != right) ? 1.0 : 0.0;
+
+        instruction.op = "=";
+        instruction.arg1 = toString(folded);
+        instruction.arg2.clear();
+    }
+
+    for (auto& instruction : instructions) {
+        if (instruction.op != "root" && instruction.op != "flr" && instruction.op != "ceil" && instruction.op != "abs" &&
+            instruction.op != "logarithm" && instruction.op != "sine" && instruction.op != "cosine" && instruction.op != "tan" &&
+            instruction.op != "asine" && instruction.op != "acosine" && instruction.op != "atan" && instruction.op != "prime") {
+            continue;
+        }
+
+        if (!isNumeric(instruction.arg1)) {
+            continue;
+        }
+
+        double value = toNumber(instruction.arg1);
+        double folded = 0.0;
+
+        if (instruction.op == "root") {
+            if (value < 0.0) {
+                continue;
+            }
+            folded = std::sqrt(value);
+        } else if (instruction.op == "flr") {
+            folded = std::floor(value);
+        } else if (instruction.op == "ceil") {
+            folded = std::ceil(value);
+        } else if (instruction.op == "abs") {
+            folded = std::fabs(value);
+        } else if (instruction.op == "logarithm") {
+            if (value <= 0.0) {
+                continue;
+            }
+            folded = std::log(value);
+        } else if (instruction.op == "sine") {
+            folded = std::sin(value);
+        } else if (instruction.op == "cosine") {
+            folded = std::cos(value);
+        } else if (instruction.op == "tan") {
+            folded = std::tan(value);
+        } else if (instruction.op == "asine") {
+            if (value < -1.0 || value > 1.0) {
+                continue;
+            }
+            folded = std::asin(value);
+        } else if (instruction.op == "acosine") {
+            if (value < -1.0 || value > 1.0) {
+                continue;
+            }
+            folded = std::acos(value);
+        } else if (instruction.op == "atan") {
+            folded = std::atan(value);
+        } else if (instruction.op == "prime") {
+            long long n = static_cast<long long>(std::llround(value));
+            if (n < 2) {
+                folded = 0.0;
+            } else {
+                bool isPrime = true;
+                for (long long i = 2; i * i <= n; ++i) {
+                    if (n % i == 0) {
+                        isPrime = false;
+                        break;
+                    }
+                }
+                folded = isPrime ? 1.0 : 0.0;
+            }
+        }
 
         instruction.op = "=";
         instruction.arg1 = toString(folded);
@@ -394,6 +504,10 @@ void TACGenerator::printCode(const std::string& title) const {
             std::cout << instruction.result << " = call " << instruction.arg1 << " (" << instruction.arg2 << " args)";
         } else if (instruction.op == "=") {
             std::cout << instruction.result << " = " << instruction.arg1;
+        } else if (instruction.op == "root" || instruction.op == "flr" || instruction.op == "ceil" || instruction.op == "abs" ||
+                   instruction.op == "logarithm" || instruction.op == "sine" || instruction.op == "cosine" || instruction.op == "tan" ||
+                   instruction.op == "asine" || instruction.op == "acosine" || instruction.op == "atan" || instruction.op == "prime") {
+            std::cout << instruction.result << " = " << instruction.op << "(" << instruction.arg1 << ")";
         } else {
             std::cout << instruction.result << " = " << instruction.arg1 << " " << instruction.op << " " << instruction.arg2;
         }
@@ -418,6 +532,12 @@ void TACGenerator::execute() {
 
     std::vector<CallFrame> callStack;
     int pc = 0;
+    constexpr int kMaxCallDepth = 1024;
+    constexpr int kMaxArrayElements = 1000000;
+
+    auto runtimeError = [](const std::string& message) {
+        std::cerr << "RUNTIME ERROR: " << message << std::endl;
+    };
 
     while (pc >= 0 && pc < static_cast<int>(instructions.size())) {
         const TACInstruction& instruction = instructions[pc];
@@ -428,14 +548,24 @@ void TACGenerator::execute() {
         }
 
         if (instruction.op == "goto") {
-            pc = labelToIndex[instruction.result];
+            auto labelIt = labelToIndex.find(instruction.result);
+            if (labelIt == labelToIndex.end()) {
+                runtimeError("invalid jump target '" + instruction.result + "'");
+                break;
+            }
+            pc = labelIt->second;
             continue;
         }
 
         if (instruction.op == "ifFalse") {
             RuntimeValue condition = getValue(instruction.arg1);
             if (!valueToBool(condition)) {
-                pc = labelToIndex[instruction.result];
+                auto labelIt = labelToIndex.find(instruction.result);
+                if (labelIt == labelToIndex.end()) {
+                    runtimeError("invalid conditional jump target '" + instruction.result + "'");
+                    break;
+                }
+                pc = labelIt->second;
             } else {
                 ++pc;
             }
@@ -451,9 +581,19 @@ void TACGenerator::execute() {
         if (instruction.op == "decl_arr") {
             int size = static_cast<int>(valueToNumber(getValue(instruction.arg2)));
             if (size < 0) {
+                runtimeError("negative array size for '" + instruction.result + "'");
                 size = 0;
             }
-            arrays[instruction.result] = std::vector<RuntimeValue>(size, 0.0);
+            if (size > kMaxArrayElements) {
+                runtimeError("array '" + instruction.result + "' exceeds maximum allowed size");
+                size = kMaxArrayElements;
+            }
+            try {
+                arrays[instruction.result] = std::vector<RuntimeValue>(size, 0.0);
+            } catch (const std::bad_alloc&) {
+                runtimeError("out of memory while allocating array '" + instruction.result + "'");
+                break;
+            }
             ++pc;
             continue;
         }
@@ -487,9 +627,17 @@ void TACGenerator::execute() {
         if (instruction.op == "store") {
             int index = static_cast<int>(valueToNumber(getValue(instruction.arg2)));
             auto arrayIt = arrays.find(instruction.arg1);
-            if (arrayIt != arrays.end() && index >= 0 && index < static_cast<int>(arrayIt->second.size())) {
-                arrayIt->second[index] = getValue(instruction.result);
+            if (arrayIt == arrays.end()) {
+                runtimeError("bad reference to undeclared array '" + instruction.arg1 + "'");
+                ++pc;
+                continue;
             }
+            if (index < 0 || index >= static_cast<int>(arrayIt->second.size())) {
+                runtimeError("array index out of bounds for '" + instruction.arg1 + "' at index " + std::to_string(index));
+                ++pc;
+                continue;
+            }
+            arrayIt->second[index] = getValue(instruction.result);
             ++pc;
             continue;
         }
@@ -497,11 +645,19 @@ void TACGenerator::execute() {
         if (instruction.op == "load") {
             int index = static_cast<int>(valueToNumber(getValue(instruction.arg2)));
             auto arrayIt = arrays.find(instruction.arg1);
-            if (arrayIt != arrays.end() && index >= 0 && index < static_cast<int>(arrayIt->second.size())) {
-                setValue(instruction.result, arrayIt->second[index]);
-            } else {
+            if (arrayIt == arrays.end()) {
+                runtimeError("bad reference to undeclared array '" + instruction.arg1 + "'");
                 setValue(instruction.result, 0.0);
+                ++pc;
+                continue;
             }
+            if (index < 0 || index >= static_cast<int>(arrayIt->second.size())) {
+                runtimeError("array index out of bounds for '" + instruction.arg1 + "' at index " + std::to_string(index));
+                setValue(instruction.result, 0.0);
+                ++pc;
+                continue;
+            }
+            setValue(instruction.result, arrayIt->second[index]);
             ++pc;
             continue;
         }
@@ -527,6 +683,14 @@ void TACGenerator::execute() {
         if (instruction.op == "call") {
             auto functionIt = functionBounds.find(instruction.arg1);
             if (functionIt == functionBounds.end()) {
+                runtimeError("undefined function '" + instruction.arg1 + "'");
+                setValue(instruction.result, 0.0);
+                ++pc;
+                continue;
+            }
+
+            if (static_cast<int>(callStack.size()) >= kMaxCallDepth) {
+                runtimeError("stack overflow while calling '" + instruction.arg1 + "'");
                 setValue(instruction.result, 0.0);
                 ++pc;
                 continue;
@@ -563,6 +727,10 @@ void TACGenerator::execute() {
             if (!callStack.empty()) {
                 CallFrame call = callStack.back();
                 callStack.pop_back();
+                if (frames.size() <= 1) {
+                    runtimeError("invalid return frame state");
+                    break;
+                }
                 frames.pop_back();
                 setValue(call.returnTemp, returnValue);
                 pc = call.returnPc;
@@ -577,6 +745,10 @@ void TACGenerator::execute() {
             if (!callStack.empty()) {
                 CallFrame call = callStack.back();
                 callStack.pop_back();
+                if (frames.size() <= 1) {
+                    runtimeError("invalid function frame state");
+                    break;
+                }
                 frames.pop_back();
                 setValue(call.returnTemp, 0.0);
                 pc = call.returnPc;
@@ -597,7 +769,82 @@ void TACGenerator::execute() {
             continue;
         }
 
+        if (instruction.op == "root" || instruction.op == "flr" || instruction.op == "ceil" || instruction.op == "abs" ||
+            instruction.op == "logarithm" || instruction.op == "sine" || instruction.op == "cosine" || instruction.op == "tan" ||
+            instruction.op == "asine" || instruction.op == "acosine" || instruction.op == "atan" || instruction.op == "prime") {
+            double value = valueToNumber(getValue(instruction.arg1));
+            double computed = 0.0;
+
+            if (instruction.op == "root") {
+                if (value < 0.0) {
+                    runtimeError("root() domain error for value " + toString(value));
+                    setValue(instruction.result, 0.0);
+                    ++pc;
+                    continue;
+                }
+                computed = std::sqrt(value);
+            } else if (instruction.op == "flr") {
+                computed = std::floor(value);
+            } else if (instruction.op == "ceil") {
+                computed = std::ceil(value);
+            } else if (instruction.op == "abs") {
+                computed = std::fabs(value);
+            } else if (instruction.op == "logarithm") {
+                if (value <= 0.0) {
+                    runtimeError("logarithm() domain error for value " + toString(value));
+                    setValue(instruction.result, 0.0);
+                    ++pc;
+                    continue;
+                }
+                computed = std::log(value);
+            } else if (instruction.op == "sine") {
+                computed = std::sin(value);
+            } else if (instruction.op == "cosine") {
+                computed = std::cos(value);
+            } else if (instruction.op == "tan") {
+                computed = std::tan(value);
+            } else if (instruction.op == "asine") {
+                if (value < -1.0 || value > 1.0) {
+                    runtimeError("asine() domain error for value " + toString(value));
+                    setValue(instruction.result, 0.0);
+                    ++pc;
+                    continue;
+                }
+                computed = std::asin(value);
+            } else if (instruction.op == "acosine") {
+                if (value < -1.0 || value > 1.0) {
+                    runtimeError("acosine() domain error for value " + toString(value));
+                    setValue(instruction.result, 0.0);
+                    ++pc;
+                    continue;
+                }
+                computed = std::acos(value);
+            } else if (instruction.op == "atan") {
+                computed = std::atan(value);
+            } else if (instruction.op == "prime") {
+                long long n = static_cast<long long>(std::llround(value));
+                if (n < 2) {
+                    computed = 0.0;
+                } else {
+                    bool isPrime = true;
+                    for (long long i = 2; i * i <= n; ++i) {
+                        if (n % i == 0) {
+                            isPrime = false;
+                            break;
+                        }
+                    }
+                    computed = isPrime ? 1.0 : 0.0;
+                }
+            }
+
+            setValue(instruction.result, computed);
+            ++pc;
+            continue;
+        }
+
         if (instruction.op == "+" || instruction.op == "-" || instruction.op == "*" || instruction.op == "/" ||
+            instruction.op == "%" || instruction.op == "**" ||
+            instruction.op == "AND" || instruction.op == "OR" || instruction.op == "XOR" ||
             instruction.op == "<" || instruction.op == ">" || instruction.op == "<=" || instruction.op == ">=" ||
             instruction.op == "==" || instruction.op == "!=") {
             setValue(instruction.result, evalBinary(instruction));
