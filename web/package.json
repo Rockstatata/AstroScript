@@ -2,9 +2,13 @@
   "name": "web",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.11.0"
+  },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "generate:lang-ref": "node scripts/generate-language-reference.mjs",
+    "dev": "npm run generate:lang-ref && next dev",
+    "build": "npm run generate:lang-ref && next build",
     "start": "next start",
     "lint": "eslint"
   },
