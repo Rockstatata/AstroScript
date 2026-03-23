@@ -1,47 +1,45 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 const navLinks = [
   { label: "Playground", href: "/playground" },
   { label: "Docs", href: "/docs" },
-  { label: "Language", href: "/docs/syntax" },
   { label: "GitHub", href: "https://github.com/Rockstatata/AstroScript", external: true },
 ];
 
-function RocketIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="h-5 w-5 text-primary"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    >
-      <path d="M8.4 15.6c-1.5-3.2.4-8.2 4.8-11.1 4.4 2.9 6.3 7.9 4.8 11.1-2 1.9-4.5 2.9-4.8 3-.3-.1-2.8-1.1-4.8-3Z" />
-      <path d="M5 19c1.5-.2 2.8-1 3.8-2.3M11.2 10.5l2.3 2.3" />
-      <circle cx="14.7" cy="8.9" r="1.1" />
-      <path d="M5.2 14.2 3.8 16.9l2.7-1.4M10.8 19.8l-1.4 2.7 2.7-1.4" />
-    </svg>
-  );
-}
-
 export default function Navbar() {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+
+  const isActive = (href: string) => {
+    if (href === "/docs") {
+      return pathname.startsWith("/docs");
+    }
+    return pathname === href;
+  };
+
   return (
-    <header className="sticky top-0 z-50 border-b border-primary/10 bg-black/40 backdrop-blur-xl">
-      <nav className="mx-auto flex h-16 w-full max-w-[1240px] items-center justify-between px-5 md:px-8">
-        <Link href="/" className="inline-flex items-center gap-2 text-[27px] font-semibold leading-none text-white">
-          <RocketIcon />
-          <span className="text-[28px]">AstroScript</span>
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0f121bd9] backdrop-blur-xl">
+      <nav className="mx-auto flex h-16 w-full max-w-310 items-center justify-between px-4 md:px-8">
+        <Link href="/" className="inline-flex items-center text-[26px] font-semibold leading-none text-white" onClick={() => setOpen(false)}>
+          <span className="tracking-tight" style={{ fontFamily: "var(--font-space-grotesk)" }}>AstroScript</span>
         </Link>
 
-        <ul className="hidden items-center gap-9 text-sm font-semibold text-white/90 md:flex">
+        <ul className="hidden items-center gap-8 text-sm font-semibold text-white/85 md:flex">
           {navLinks.map((item) => (
             <li key={item.label}>
               <Link
                 href={item.href}
                 target={item.external ? "_blank" : undefined}
                 rel={item.external ? "noreferrer" : undefined}
-                className="transition-colors hover:text-white"
+                className={item.external
+                  ? "rounded-md px-2 py-1 transition-colors hover:text-white"
+                  : isActive(item.href)
+                    ? "rounded-md bg-white/8 px-2 py-1 text-white"
+                    : "rounded-md px-2 py-1 transition-colors hover:bg-white/6 hover:text-white"}
               >
                 {item.label}
               </Link>
@@ -49,13 +47,40 @@ export default function Navbar() {
           ))}
         </ul>
 
-        <Link
-          href="/playground"
-          className="rounded-md border border-primary/40 bg-primary px-5 py-2 text-sm font-semibold text-white shadow-[0_0_20px_rgba(44,44,226,0.4)] transition-all hover:scale-[1.02] hover:bg-[#3a3af0]"
+        <button
+          type="button"
+          aria-label="Toggle navigation"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-white/15 text-white/85 md:hidden"
+          onClick={() => setOpen((value) => !value)}
         >
-          Try Playground
-        </Link>
+          <span className="sr-only">Menu</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </button>
       </nav>
+
+      <div className={`border-t border-white/10 bg-[#101523] px-4 py-3 md:hidden ${open ? "block" : "hidden"}`}>
+        <ul className="flex flex-col gap-2 text-sm font-semibold text-white/90">
+          {navLinks.map((item) => (
+            <li key={item.label}>
+              <Link
+                href={item.href}
+                target={item.external ? "_blank" : undefined}
+                rel={item.external ? "noreferrer" : undefined}
+                onClick={() => setOpen(false)}
+                className={item.external
+                  ? "block rounded-md px-3 py-2 hover:bg-white/6"
+                  : isActive(item.href)
+                    ? "block rounded-md bg-white/10 px-3 py-2 text-white"
+                    : "block rounded-md px-3 py-2 hover:bg-white/6"}
+              >
+                {item.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
     </header>
   );
 }

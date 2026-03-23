@@ -35,23 +35,23 @@ const cards = [
 
 export default function FeatureCards() {
   return (
-    <section className="mx-auto w-full max-w-[1240px] border-t border-white/8 px-5 py-24 lg:px-8">
-      <h2 className="text-center text-5xl font-bold tracking-[-0.02em] text-white">Engineered for the Void</h2>
-      <p className="mx-auto mt-6 max-w-[760px] text-center text-lg leading-relaxed text-white/65 md:text-[1.35rem]">
+    <section className="mx-auto w-full max-w-310 border-t border-white/8 px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+      <h2 className="text-center text-[clamp(2rem,5vw,3.3rem)] font-semibold tracking-[-0.02em] text-white" style={{ fontFamily: "var(--font-space-grotesk)" }}>Engineered for the Void</h2>
+      <p className="mx-auto mt-5 max-w-[66ch] text-center text-[clamp(1rem,2.2vw,1.18rem)] leading-relaxed text-[#c9d2ff]/74">
         Robust architecture meeting the demands of high-concurrency interstellar computing.
       </p>
 
-      <div className="mt-16 grid gap-5 md:grid-cols-3">
+      <div className="mt-12 grid gap-4 md:grid-cols-3 lg:gap-5">
         {cards.map((card) => (
           <article
             key={card.title}
-            className="rounded-xl border border-primary/20 bg-black/30 p-8 backdrop-blur-md transition-all hover:scale-[1.02] hover:border-primary/50 hover:shadow-[0_0_24px_rgba(44,44,226,0.22)]"
+            className="rounded-xl border border-white/12 bg-[#171d2f]/78 p-6 backdrop-blur-sm hover:-translate-y-1 hover:border-primary/40 hover:bg-[#1b2237]"
           >
-            <div className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-lg border border-primary/30 bg-primary/15 text-primary">
+            <div className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-lg border border-primary/35 bg-primary/15 text-[#9dadff]">
               {card.icon}
             </div>
-            <h3 className="text-[1.95rem] font-semibold leading-tight text-white">{card.title}</h3>
-            <p className="mt-4 text-base leading-relaxed text-white/66">{card.description}</p>
+            <h3 className="text-[1.38rem] font-semibold leading-tight text-white">{card.title}</h3>
+            <p className="mt-3 text-[0.98rem] leading-relaxed text-[#c9d1f2]/72">{card.description}</p>
           </article>
         ))}
       </div>

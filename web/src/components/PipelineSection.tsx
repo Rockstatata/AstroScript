@@ -49,20 +49,20 @@ const steps = [
 
 export default function PipelineSection() {
   return (
-    <section className="mx-auto w-full max-w-[1240px] border-t border-white/8 px-5 py-24 lg:px-8">
-      <h2 className="text-center text-5xl font-bold tracking-[-0.02em] text-white">How AstroScript Works</h2>
+    <section className="mx-auto w-full max-w-310 border-t border-white/8 px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+      <h2 className="text-center text-[clamp(2rem,5vw,3.3rem)] font-semibold tracking-[-0.02em] text-white" style={{ fontFamily: "var(--font-space-grotesk)" }}>How AstroScript Works</h2>
 
-      <div className="relative mt-16">
-        <div className="absolute left-0 top-7 hidden h-[1px] w-full bg-gradient-to-r from-transparent via-primary/60 to-transparent lg:block" />
+      <div className="relative mt-12">
+        <div className="absolute left-0 top-7 hidden h-px w-full bg-linear-to-r from-transparent via-primary/60 to-transparent lg:block" />
 
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-5 lg:gap-6">
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-5 lg:gap-5">
           {steps.map((step) => (
             <article key={step.title} className="relative text-center">
-              <div className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-xl border border-primary/40 bg-primary/10 text-primary">
+              <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-lg border border-primary/40 bg-primary/12 text-[#a1b0ff]">
                 {step.icon}
               </div>
-              <h3 className="mt-5 text-[1.72rem] font-semibold leading-tight text-white">{step.title}</h3>
-              <p className="mt-2 text-base leading-relaxed text-white/65">{step.subtitle}</p>
+              <h3 className="mt-4 text-[1.2rem] font-semibold leading-tight text-white">{step.title}</h3>
+              <p className="mt-2 text-[0.95rem] leading-relaxed text-[#c9d1f2]/70">{step.subtitle}</p>
             </article>
           ))}
         </div>
