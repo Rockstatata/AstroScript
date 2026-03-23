@@ -1,9 +1,18 @@
 import DocsCallout from "@/components/docs/DocsCallout";
 import DocsCodeBlock from "@/components/docs/DocsCodeBlock";
 
-const quickStartCode = `curl -sSL https://get.astroscript.dev | sh
-astro init my-app
-cd my-app && astro run`;
+const quickStartCode = `# macOS / Linux
+./scripts/build_compiler.sh
+./backend/compiler/build/astroscript examples/comprehensive.as
+
+# Windows (PowerShell)
+.\\scripts\\build_compiler.ps1
+.\\backend\\compiler\\build\\astroscript.exe .\\examples\\comprehensive.as
+
+# Start docs and playground
+cd web
+npm install
+npm run dev`;
 
 const astroExample = `mission Apollo launch
 {
@@ -11,11 +20,12 @@ const astroExample = `mission Apollo launch
 
     verify (astronauts > 0)
     {
-        broadcast("Mission ready").
+      transmit "Mission ready".
     }
 
     orbit (astronauts > 0)
     {
+      transmit astronauts.
         astronauts := astronauts minus 1.
     }
 }
@@ -84,10 +94,10 @@ export default function DocsIntroduction() {
           </article>
 
           <article className="rounded-xl border border-white/10 bg-slate-900/50 p-5">
-            <h4 className="text-2xl font-semibold text-white">Distributed-First Architecture</h4>
+            <h4 className="text-2xl font-semibold text-white">Inspectable Compiler Pipeline</h4>
             <p className="mt-2 text-sm leading-7 text-white/65">
-              Space mission semantics naturally model staged workflows, orchestration, and modular
-              compiler responsibilities.
+              Each stage, from tokenization to TAC execution, is intentionally transparent for
+              debugging and learning compiler internals.
             </p>
           </article>
         </div>

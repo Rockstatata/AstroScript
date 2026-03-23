@@ -1,17 +1,51 @@
-import Link from "next/link";
+"use client";
 
-const links = [
-  { href: "#what-is-astroscript", label: "What is AstroScript?" },
-  { href: "#core-philosophy", label: "Core Philosophy" },
-  { href: "#quick-start", label: "Quick Start" },
-  { href: "#simple-example", label: "A Simple Example" },
-  { href: "#community-support", label: "Community Support" },
-];
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+const pageLinks: Record<string, Array<{ href: string; label: string }>> = {
+  introduction: [
+    { href: "#what-is-astroscript", label: "What is AstroScript?" },
+    { href: "#core-philosophy", label: "Core Philosophy" },
+    { href: "#quick-start", label: "Quick Start" },
+    { href: "#simple-example", label: "A Simple Example" },
+    { href: "#community-support", label: "Community Support" },
+  ],
+  syntax: [
+    { href: "#program-structure", label: "Program Structure" },
+    { href: "#declarations-and-assignment", label: "Declarations and Assignment" },
+    { href: "#conditionals-and-loops", label: "Conditionals and Loops" },
+    { href: "#functions-and-io", label: "Functions and I/O" },
+  ],
+  keywords: [
+    { href: "#program-structure-keywords", label: "Program Structure" },
+    { href: "#declarations-and-types-keywords", label: "Declarations and Types" },
+    { href: "#types-keywords", label: "Types" },
+    { href: "#control-flow-keywords", label: "Control Flow" },
+    { href: "#functions-and-i-o-keywords", label: "Functions and I/O" },
+    { href: "#modules-keywords", label: "Modules" },
+    { href: "#operators-keywords", label: "Operators" },
+  ],
+  architecture: [
+    { href: "#pipeline-overview", label: "Pipeline Overview" },
+    { href: "#compiler-phases", label: "Compiler Phases" },
+    { href: "#directory-structure", label: "Directory Structure" },
+  ],
+};
 
 export default function DocsRightSidebar() {
+  const pathname = usePathname();
+  const links = pathname.startsWith("/docs/syntax")
+    ? pageLinks.syntax
+    : pathname.startsWith("/docs/keywords")
+      ? pageLinks.keywords
+      : pathname.startsWith("/docs/architecture")
+        ? pageLinks.architecture
+        : pageLinks.introduction;
+
   return (
     <aside
-      className="sticky top-16 hidden h-[calc(100vh-4rem)] w-[270px] shrink-0 px-5 py-8 xl:block"
+      className="sticky top-16 hidden h-[calc(100vh-4rem)] w-67.5 shrink-0 border-l border-white/6 bg-[#121725]/35 px-5 py-8 backdrop-blur-sm xl:block"
       aria-label="On this page"
     >
       <div className="space-y-6">
@@ -23,7 +57,7 @@ export default function DocsRightSidebar() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm text-white/55 transition-colors duration-200 hover:text-primary"
+                    className="text-sm text-white/62 transition-colors duration-200 hover:text-[#aebcff]"
                   >
                     {link.label}
                   </Link>

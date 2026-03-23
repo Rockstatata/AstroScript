@@ -20,7 +20,7 @@ export default function DocsArchitecture() {
         </p>
       </header>
 
-      <section className="mt-10">
+      <section id="pipeline-overview" className="mt-10 scroll-mt-24">
         <h2 className="text-3xl font-semibold tracking-tight text-white">Pipeline Overview</h2>
         <div className="mt-4">
           <DocsCodeBlock
@@ -48,7 +48,7 @@ Execution (TAC Interpreter)`}
         </div>
       </section>
 
-      <section className="mt-10 space-y-8">
+      <section id="compiler-phases" className="mt-10 space-y-8 scroll-mt-24">
         {[
           [
             "1. Lexical Analysis",
@@ -82,7 +82,7 @@ Execution (TAC Interpreter)`}
         ))}
       </section>
 
-      <section className="mt-10">
+      <section id="directory-structure" className="mt-10 scroll-mt-24">
         <h2 className="text-3xl font-semibold tracking-tight text-white">Directory Structure</h2>
         <div className="mt-4">
           <DocsCodeBlock

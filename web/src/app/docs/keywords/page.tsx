@@ -1,47 +1,6 @@
-const sections: Array<{ title: string; rows: string[][] }> = [
-  {
-    title: "Program Structure",
-    rows: [
-      ["mission", "Program entry point", "main()"],
-      ["launch", "Begin mission block", "main body"],
-      ["success", "Successful termination", "return 0"],
-      ["abort", "Abnormal termination", "exit(1)"],
-    ],
-  },
-  {
-    title: "Types",
-    rows: [
-      ["count", "Integer type", "int"],
-      ["real", "Floating-point type", "float"],
-      ["precise", "Double precision", "double"],
-      ["flag", "Boolean signal", "bool"],
-      ["symbol", "Character type", "char"],
-      ["voidspace", "No return value", "void"],
-    ],
-  },
-  {
-    title: "Control Flow",
-    rows: [
-      ["verify", "Conditional check", "if"],
-      ["else_verify", "Alternate condition", "else if"],
-      ["otherwise", "Fallback branch", "else"],
-      ["orbit", "Loop construct", "while"],
-      ["stage_sep", "Exit loop", "break"],
-      ["coast", "Skip iteration", "continue"],
-    ],
-  },
-  {
-    title: "Functions and Modules",
-    rows: [
-      ["command", "Define a function", "function"],
-      ["back", "Return from function", "return"],
-      ["module", "Class-like module", "class"],
-      ["deploy", "Instantiate module", "new"],
-      ["extends", "Inheritance", "extends"],
-      ["this", "Current instance", "this"],
-    ],
-  },
-];
+import languageRef from "@/lib/language-reference.generated.json";
+
+const generatedAtText = new Date(languageRef.generatedAt).toLocaleString();
 
 export default function DocsKeywords() {
   return (
@@ -60,11 +19,12 @@ export default function DocsKeywords() {
           AstroScript maps mission vocabulary to familiar compiler constructs. This table is your
           quick reference when translating C/C++ ideas into AstroScript grammar.
         </p>
+        <p className="mt-3 text-sm text-white/45">Generated from lexer/parser sources: {generatedAtText}</p>
       </header>
 
       <div className="mt-10 space-y-10">
-        {sections.map((section) => (
-          <section key={section.title}>
+        {languageRef.keywordSections.map((section) => (
+          <section key={section.title} id={section.id} className="scroll-mt-24">
             <h2 className="mb-4 text-3xl font-semibold tracking-tight text-white">{section.title}</h2>
             <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#12162f]/70">
               <table className="w-full min-w-155 text-left text-sm">
@@ -73,14 +33,26 @@ export default function DocsKeywords() {
                     <th className="px-4 py-3">Keyword</th>
                     <th className="px-4 py-3">Purpose</th>
                     <th className="px-4 py-3">C/C++ Equivalent</th>
+                    <th className="px-4 py-3">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {section.rows.map((row) => (
-                    <tr key={row[0]} className="border-t border-white/8 text-white/70">
-                      <td className="px-4 py-3 font-mono text-primary">{row[0]}</td>
-                      <td className="px-4 py-3">{row[1]}</td>
-                      <td className="px-4 py-3 font-mono">{row[2]}</td>
+                    <tr key={row.keyword} className="border-t border-white/8 text-white/70">
+                      <td className="px-4 py-3 font-mono text-primary">{row.keyword}</td>
+                      <td className="px-4 py-3">{row.purpose}</td>
+                      <td className="px-4 py-3 font-mono">{row.equivalent}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] uppercase tracking-[0.08em] ${
+                            row.status === "active"
+                              ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
+                              : "border-amber-400/30 bg-amber-400/10 text-amber-200"
+                          }`}
+                        >
+                          {row.status}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -90,9 +62,9 @@ export default function DocsKeywords() {
         ))}
 
         <section>
-          <h2 className="mb-4 text-3xl font-semibold tracking-tight text-white">Math Built-ins</h2>
-          <p className="rounded-xl border border-white/10 bg-[#12162f]/70 px-4 py-4 font-mono text-sm leading-7 text-primary/90">
-            root, flr, ceil, abs, logarithm, sine, cosine, tan, asine, acosine, atan, prime
+          <h2 className="mb-4 text-3xl font-semibold tracking-tight text-white">Reference Note</h2>
+          <p className="rounded-xl border border-white/10 bg-[#12162f]/70 px-4 py-4 text-sm leading-7 text-white/80">
+            {languageRef.notes.reservedMeaning}
           </p>
         </section>
       </div>

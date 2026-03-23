@@ -6,18 +6,14 @@ import { usePathname } from "next/navigation";
 const navItems = [
   { href: "/docs", label: "Introduction" },
   { href: "/docs/syntax", label: "Language Basics" },
-  { href: "/docs/keywords", label: "Variables" },
-  { href: "/docs/keywords", label: "Operators" },
-  { href: "/docs/syntax", label: "Control Flow" },
-  { href: "/docs/architecture", label: "Modules" },
-  { href: "/docs/architecture", label: "Functions" },
+  { href: "/docs/keywords", label: "Keywords" },
   { href: "/docs/architecture", label: "Compiler Architecture" },
 ];
 
 const guideItems = [
   { href: "/docs", label: "Getting Started" },
-  { href: "/docs/architecture", label: "Cloud Deployment" },
-  { href: "/docs/syntax", label: "Security Best Practices" },
+  { href: "/playground", label: "Interactive Playground" },
+  { href: "/docs/architecture", label: "Compiler Pipeline" },
 ];
 
 export default function DocsSidebar() {
@@ -25,14 +21,14 @@ export default function DocsSidebar() {
   const activeLabel = pathname.startsWith("/docs/architecture")
     ? "Compiler Architecture"
     : pathname.startsWith("/docs/keywords")
-      ? "Variables"
+      ? "Keywords"
       : pathname.startsWith("/docs/syntax")
         ? "Language Basics"
         : "Introduction";
 
   return (
     <aside
-      className="sticky top-16 hidden h-[calc(100vh-4rem)] w-72 shrink-0 border-r border-white/10 px-4 py-6 lg:block"
+      className="sticky top-16 hidden h-[calc(100vh-4rem)] w-72 shrink-0 border-r border-white/10 bg-[#121725]/55 px-4 py-6 backdrop-blur-sm lg:block"
       aria-label="Documentation sidebar"
     >
       <div className="h-full overflow-y-auto pr-2">
@@ -50,8 +46,8 @@ export default function DocsSidebar() {
                     href={item.href}
                     className={
                       isActive
-                        ? "flex items-center rounded-md bg-primary/15 px-3 py-2 text-sm font-medium text-primary"
-                        : "flex items-center rounded-md px-3 py-2 text-sm text-white/65 transition-colors duration-200 hover:bg-white/4 hover:text-white"
+                        ? "flex items-center rounded-md bg-primary/20 px-3 py-2 text-sm font-medium text-[#b1bfff]"
+                        : "flex items-center rounded-md px-3 py-2 text-sm text-white/70 transition-colors duration-200 hover:bg-white/6 hover:text-white"
                     }
                   >
                     <span className="mr-2 h-1.5 w-1.5 rounded-full bg-current opacity-80" aria-hidden="true" />

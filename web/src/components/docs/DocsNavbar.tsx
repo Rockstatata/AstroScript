@@ -20,7 +20,7 @@ export default function DocsNavbar() {
           <Link href="/" className="group inline-flex items-center gap-2.5">
             <span className="relative inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/15 bg-[#151536] text-primary shadow-[0_0_30px_-12px_rgba(44,44,226,0.85)]">
               <span
-                className="h-3 w-3 rounded-xs bg-current"
+                className="h-3 w-3 rounded-sm bg-current"
                 style={{ clipPath: "polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)" }}
               />
             </span>

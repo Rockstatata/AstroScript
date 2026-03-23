@@ -28,11 +28,13 @@ function highlightCode(code: string, language: DocsCodeBlockProps["language"]) {
 
   if (language === "astroscript") {
     html = html
+      .replace(/(\$\*[\s\S]*?\*\$)/g, '<span class="text-[#6b7396]">$1</span>')
       .replace(/(\$\$.*)$/gm, '<span class="text-[#6b7396]">$1</span>')
-      .replace(/("[^"]*")/g, '<span class="text-[#71d8ad]">$1</span>')
-      .replace(/\b(\d+)\b/g, '<span class="text-[#f4c97b]">$1</span>')
+      .replace(/("([^"\\]|\\.)*")/g, '<span class="text-[#71d8ad]">$1</span>')
+      .replace(/\b(-?\d+(?:\.\d+)?)\b/g, '<span class="text-[#f4c97b]">$1</span>')
+      .replace(/(:->|:=|==|!=|<=|>=|\*\*|[+\-*/<>])/g, '<span class="text-[#f8d189]">$1</span>')
       .replace(
-        /\b(mission|launch|success|abort|telemetry|limit|verify|else_verify|otherwise|orbit|times|broadcast|receive|command|back|count|real|precise|flag|symbol|voidspace|module|deploy|extends|public|private|this|fleet|mode|alias|add|minus|mul|divide|mod|AND|OR|NOT|XOR)\b/g,
+        /\b(mission|launch|success|abort|telemetry|limit|verify|else_verify|otherwise|orbit|while|times|scenario|trajectory|fallback|stage_sep|coast|broadcast|receive|alarm|command|back|count|real|precise|flag|symbol|voidspace|module|deploy|extends|public|private|this|fleet|mode|alias|wait|tick|root|flr|ceil|abs|logarithm|sine|cosine|tan|asine|acosine|atan|prime|add|minus|mul|divide|mod|AND|OR|NOT|XOR)\b/g,
         '<span class="text-[#8ab4ff]">$1</span>',
       );
   }
