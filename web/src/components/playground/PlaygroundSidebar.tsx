@@ -27,7 +27,7 @@ const icons = [
 
 export function PlaygroundSidebar() {
   return (
-    <aside className="flex w-12 shrink-0 flex-col items-center justify-between border-r border-white/10 bg-[#0e1023] py-3">
+    <aside className="hidden w-12 shrink-0 flex-col items-center justify-between border-r border-white/10 bg-[#0f1426] py-3 md:flex">
       <div className="flex flex-col items-center gap-2">
         {icons.map((icon, index) => (
           <button
