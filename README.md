@@ -40,6 +40,11 @@ Windows (PowerShell):
 .\scripts\build_compiler.ps1
 ```
 
+Build script outputs:
+
+- Windows binary is copied to `web/src/server/compiler/astroscript-windows.exe`
+- Linux binary is copied to `web/src/server/compiler/astroscript-linux`
+
 ### Run a Program
 
 ```bash
@@ -71,6 +76,28 @@ GET /api/health
 ```
 
 Then open [http://localhost:3000](http://localhost:3000) to access the homepage and playground.
+
+### Toggle Compiler Target
+
+Use `ASTROSCRIPT_COMPILER_TARGET` to switch binaries without code changes.
+
+PowerShell:
+
+```powershell
+$env:ASTROSCRIPT_COMPILER_TARGET = "windows"
+# or
+$env:ASTROSCRIPT_COMPILER_TARGET = "linux"
+```
+
+bash:
+
+```bash
+export ASTROSCRIPT_COMPILER_TARGET=windows
+# or
+export ASTROSCRIPT_COMPILER_TARGET=linux
+```
+
+If unset, the resolver defaults to `auto` and picks based on OS.
 
 ### Vercel Deployment Notes
 

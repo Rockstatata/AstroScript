@@ -8,8 +8,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 COMPILER_DIR="$ROOT_DIR/backend/compiler"
 BUILD_DIR="$COMPILER_DIR/build"
+SERVER_COMPILER_DIR="$ROOT_DIR/web/src/server/compiler"
 
 mkdir -p "$BUILD_DIR"
+mkdir -p "$SERVER_COMPILER_DIR"
 
 echo "==> Running Flex (lexer)..."
 flex -o "$BUILD_DIR/lex.yy.c" "$COMPILER_DIR/lexer/lexer.l"
@@ -29,4 +31,8 @@ g++ \
     -std=c++17 \
     -o "$BUILD_DIR/astroscript"
 
+cp "$BUILD_DIR/astroscript" "$SERVER_COMPILER_DIR/astroscript-linux"
+chmod +x "$SERVER_COMPILER_DIR/astroscript-linux"
+
 echo "==> Build complete: $BUILD_DIR/astroscript"
+echo "==> Synced Linux binary to: $SERVER_COMPILER_DIR/astroscript-linux"

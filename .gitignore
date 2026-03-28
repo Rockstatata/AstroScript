@@ -8,6 +8,8 @@ backend/compiler/build/astroscript.exe
 # Legacy generated files
 *.exe
 *.o
+!web/src/server/compiler/astroscript-windows.exe
+!web/src/server/compiler/astroscript-linux
 
 # Python
 .venv/

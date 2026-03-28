@@ -213,7 +213,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "AstroScript compiler binary is missing. Build backend/compiler/build/astroscript(.exe) first so the playground can execute code.",
+            "AstroScript compiler binary is missing. Place binaries in web/src/server/compiler or set ASTROSCRIPT_COMPILER_PATH. Toggle preference with ASTROSCRIPT_COMPILER_TARGET=linux|windows.",
         },
         { status: 500 },
       );
