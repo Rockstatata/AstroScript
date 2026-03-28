@@ -3,6 +3,7 @@
 
 %{
 #include <stdio.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include "parser.tab.h"
@@ -12,6 +13,37 @@
 #endif
 
 extern YYSTYPE yylval;
+
+static int parse_int_literal(const char* text) {
+   if (!text || !*text) {
+      return 0;
+   }
+
+   int sign = 1;
+   if (*text == '-') {
+      sign = -1;
+      ++text;
+   }
+
+   long long value = 0;
+   while (*text >= '0' && *text <= '9') {
+      value = (value * 10) + (*text - '0');
+      if (value > static_cast<long long>(INT_MAX) + 1LL) {
+         break;
+      }
+      ++text;
+   }
+
+   const long long signedValue = sign < 0 ? -value : value;
+   if (signedValue > INT_MAX) {
+      return INT_MAX;
+   }
+   if (signedValue < INT_MIN) {
+      return INT_MIN;
+   }
+
+   return static_cast<int>(signedValue);
+}
 %}
 
 DIGIT           [0-9]
@@ -127,7 +159,7 @@ STRING_LITERAL  \"([^\"\n])*\"
                    }
 
 {INT_LITERAL}      {
-                      yylval.intval = atoi(yytext);
+                      yylval.intval = parse_int_literal(yytext);
                       return INT_LITERAL;
                    }
 

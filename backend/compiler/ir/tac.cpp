@@ -5,8 +5,57 @@
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <new>
 #include <sstream>
+
+namespace {
+double portableModulo(double left, double right) {
+    const double quotient = left / right;
+
+    // Truncate toward zero to match fmod semantics without calling libm fmod.
+    const long long truncatedQuotient = static_cast<long long>(quotient);
+    return left - (static_cast<double>(truncatedQuotient) * right);
+}
+
+bool tryParseInt(const std::string& text, int& value) {
+    if (text.empty()) {
+        return false;
+    }
+
+    std::size_t index = 0;
+    int sign = 1;
+    if (text[index] == '-') {
+        sign = -1;
+        ++index;
+    }
+
+    if (index >= text.size()) {
+        return false;
+    }
+
+    long long parsed = 0;
+    for (; index < text.size(); ++index) {
+        const char ch = text[index];
+        if (ch < '0' || ch > '9') {
+            return false;
+        }
+
+        parsed = (parsed * 10) + (ch - '0');
+        if (parsed > static_cast<long long>(std::numeric_limits<int>::max()) + 1LL) {
+            return false;
+        }
+    }
+
+    const long long signedValue = sign < 0 ? -parsed : parsed;
+    if (signedValue < std::numeric_limits<int>::min() || signedValue > std::numeric_limits<int>::max()) {
+        return false;
+    }
+
+    value = static_cast<int>(signedValue);
+    return true;
+}
+}
 
 TACGenerator::TACGenerator() : tempCounter(0), labelCounter(0) {}
 
@@ -240,7 +289,7 @@ TACGenerator::RuntimeValue TACGenerator::evalBinary(const TACInstruction& instru
             std::cerr << "RUNTIME ERROR: modulo by zero" << std::endl;
             return 0.0;
         }
-        return std::fmod(l, r);
+        return portableModulo(l, r);
     }
     if (instruction.op == "**") return std::pow(l, r);
     if (instruction.op == "AND") return (valueToBool(left) && valueToBool(right)) ? 1.0 : 0.0;
@@ -319,7 +368,7 @@ void TACGenerator::constantFold() {
             if (right == 0.0) {
                 continue;
             }
-            folded = std::fmod(left, right);
+            folded = portableModulo(left, right);
         }
         else if (instruction.op == "**") folded = std::pow(left, right);
         else if (instruction.op == "AND") folded = ((std::fabs(left) > 1e-12) && (std::fabs(right) > 1e-12)) ? 1.0 : 0.0;
@@ -696,7 +745,14 @@ void TACGenerator::execute() {
                 continue;
             }
 
-            int argc = std::stoi(instruction.arg2);
+            int argc = 0;
+            if (!tryParseInt(instruction.arg2, argc) || argc < 0) {
+                runtimeError("invalid function argument count '" + instruction.arg2 + "'");
+                setValue(instruction.result, 0.0);
+                ++pc;
+                continue;
+            }
+
             std::vector<RuntimeValue> args;
             for (int i = 0; i < argc && !parameterStack.empty(); ++i) {
                 args.push_back(parameterStack.back());

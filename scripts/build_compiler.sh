@@ -31,6 +31,14 @@ g++ \
     -std=c++17 \
     -o "$BUILD_DIR/astroscript"
 
+if command -v objdump >/dev/null 2>&1; then
+    if objdump -T "$BUILD_DIR/astroscript" | grep -qE '\(GLIBC_2\.(3[8-9]|[4-9][0-9])\)'; then
+        echo "ERROR: Linux binary requires GLIBC >= 2.38 and is not Vercel-compatible."
+        echo "Rebuild on an older Linux baseline or update toolchain settings before deployment."
+        exit 1
+    fi
+fi
+
 cp "$BUILD_DIR/astroscript" "$SERVER_COMPILER_DIR/astroscript-linux"
 chmod +x "$SERVER_COMPILER_DIR/astroscript-linux"
 
