@@ -289,7 +289,7 @@ Runtime keyword:
 - built-ins: `root`, `flr`, `ceil`, `abs`, `logarithm`, `sine`, `cosine`, `tan`, `asine`, `acosine`, `atan`, `prime`
 
 Module/object syntax:
-- `module`, `deploy`, `extends`, `public`, `private`, `this`
+- `module`, `deploy`, `extends`, `public`, `private`, `this`, `super`, `override`, `new`
 
 Additional declaration/control keywords:
 - `alias`, `fleet`, `stage_sep`, `coast`
@@ -353,7 +353,7 @@ This section maps requested failure classes to current behavior.
    - No class/object runtime cast system yet, not applicable.
 
 4. Bad reference (object/member):
-   - Object deployment/member access runtime is not fully implemented.
+    - Runtime now validates object references and member existence, and emits runtime diagnostics for invalid field/method access.
 
 5. True break/continue behavior:
     - `stage_sep`/`coast` are now active and map to break/continue-style control flow.
@@ -397,7 +397,38 @@ All language keywords are active; students can use the full keyword set in examp
 
 ---
 
-## 8) Full Demonstration Program (Runnable)
+## 8) Rubric Compliance Matrix (March 30, 2026)
+
+This table maps the project rubric to concrete implementation status.
+
+| Rubric Item | Status | Evidence |
+| --- | --- | --- |
+| Lexical Analysis using Flex | Complete | `backend/compiler/lexer/lexer.l` token definitions + invalid token diagnostics |
+| Token Definitions | Complete | Keywords, literals, operators, comments, and punctuators in `lexer.l` |
+| Handling Invalid Tokens | Complete | Human-readable lexical errors emitted in `lexer.l` catch-all rule |
+| Integration with Bison | Complete | Lexer returns parser tokens from `parser.tab.h`; parser consumes all active tokens |
+| Syntax Analysis using Bison | Complete | Grammar and semantic actions in `backend/compiler/parser/parser.y` |
+| Well-defined grammar rules aligned with proposal | Complete | Mission/declarations/control/functions/modules/OOP/overloading/scopes are all represented in grammar |
+| Syntax Error Handling | Complete (improved) | `yyerror` now emits clearer hints; statement recovery rule (`error DOT`) reduces cascading failures |
+| Type checking / implicit conversion / variable declaration | Complete | Type compatibility checks and declaration rules in parser semantic actions |
+| Organized parsing logic | Complete | Grammar sections are modularized by statement kind and feature area |
+| Correctness of Execution Behavior | Complete | TAC interpreter executes declarations, assignments, loops, branches, functions, methods, and object operations |
+| Variable Declaration & Assignment | Complete | `decl`, `=`, `store`, `field_set` behavior validated in runtime |
+| Expression Evaluation | Complete | Binary/unary/math/logical ops executed in TAC runtime (`evalBinary` + built-ins) |
+| Conditional Statements (if/else) | Complete | `verify/else_verify/otherwise` lowered to labeled control flow |
+| Loops | Complete | `orbit`, `orbit while`, `orbit times`, `stage_sep`, and `coast` active and executable |
+| Functions | Complete | Function calls, returns, recursion depth guard, and overload-by-arity dispatch are active |
+| Unique/Advanced Features: Intermediate Code Generation | Complete | Optimized TAC is emitted (`--- Optimized Three Address Code ---`) |
+| Unique/Advanced Features: Optimization | Complete | Constant folding, algebraic simplification, redundant move elimination |
+| Additional Learning Requirement: C mapping in playground | Complete | Compiler emits `--- C-Like Translation ---`; API returns `cCode`; playground shows C Translation tab |
+
+Verdict:
+- The implementation now satisfies the listed rubric requirements for lexical, syntax, semantics, execution behavior, IR generation, and optimization.
+- Remaining scope (future enhancement): strict fully-compilable C transpilation is optional and separate from the current readable learning translation.
+
+---
+
+## 9) Full Demonstration Program (Runnable)
 
 This mission touches nearly all currently active keywords and constructs in one place:
 
@@ -465,12 +496,12 @@ mission FullFlow launch {
 
 ---
 
-## 9) Teacher-Friendly Summary
+## 10) Teacher-Friendly Summary
 
 If you need a short oral summary:
 
 1. "AstroScript is a mission-themed language with a Flex lexer, Bison parser, TAC optimizer, and TAC interpreter."
 2. "The parser emits TAC directly while checking declaration-level semantics."
-3. "The playground compiles by invoking the native compiler binary via API and surfaces both IR and diagnostics."
+3. "The playground compiles by invoking the native compiler binary via API and surfaces IR, C-like translation, and diagnostics."
 4. "We audited keyword consistency, implemented missing documented operators, and added explicit runtime guards for common failure cases."
 5. "All published keywords are now active in compiler/runtime, and the language is stable for demonstration and coursework."

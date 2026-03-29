@@ -29,8 +29,9 @@ AstroScript uses a classic educational compiler pipeline:
 3. Symbol checks: declarations, duplicate names, undeclared usage checks.
 4. IR generation: three-address code (TAC) instructions.
 5. TAC optimization: constant folding, algebraic simplification, redundant move removal.
-6. TAC execution: interpreter runs optimized TAC.
-7. Output projection: printable lines (`PRINT:`), TAC dump, errors.
+6. C-like projection: structured learning-oriented C output from optimized TAC.
+7. TAC execution: interpreter runs optimized TAC.
+8. Output projection: printable lines (`PRINT:`), TAC dump, C-like translation, errors.
 
 Frontend playground integration:
 
@@ -54,6 +55,7 @@ Frontend playground integration:
 4. If parse returns `0` (success):
    - `tacGenerator.optimize()`
    - `tacGenerator.printCode("Optimized Three Address Code")`
+   - `tacGenerator.printCTranslation("C-Like Translation")`
    - `tacGenerator.execute()`
    - `symbolTable.printTable()`
 5. Returns parse status.
@@ -160,7 +162,7 @@ Current symbol table responsibilities:
 - Store numeric value slot (lightweight).
 - Report table at end of run.
 
-Current semantic checks are name-centric (existence/duplicates), not full static type checking.
+Most scope and compatibility checks (scope stacks, overload checks, module inheritance/member access checks) are implemented directly in `parser.y` helper logic rather than `symbol_table.cpp`.
 
 ## 2.5 TAC Model (`ir/tac.h`)
 
@@ -189,6 +191,13 @@ Key emitters:
 - I/O: `print`, `input`
 - arrays: `store`, `load`
 - functions: `func_begin`, `param_def`, `param`, `call`, `return`, `func_end`
+
+### C translation specifics (current)
+
+- Generated from optimized TAC by `printCTranslation` in `backend/compiler/ir/tac.cpp`.
+- Preserves side-effecting call/method-call instructions even when temporary results are not reused.
+- Carries visible function/method arguments into translated call sites.
+- Uses runtime stubs (`astro_new_object`, `astro_get_field`, `astro_set_field`, `astro_call_methodv`) for object semantics in the learning view.
 
 ### Optimization passes
 

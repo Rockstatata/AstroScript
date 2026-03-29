@@ -184,7 +184,63 @@ mission ComprehensiveTest launch {
     }
     
     $$ ==========================================
-    $$ 8. FINAL SUMMARY
+    $$ 8. OOP + OVERLOADING + SCOPED SHADOWING
+    $$ ==========================================
+
+    command route(count normal) : count {
+        back normal add 1.
+    }
+
+    command route(count normal, count emergency) : count {
+        back normal add emergency.
+    }
+
+    module MissionQueue {
+        public telemetry count backlog := 0.
+
+        command MissionQueue(count seed) : voidspace {
+            this.backlog := seed.
+        }
+
+        command enqueue(count tasks) : count {
+            this.backlog := this.backlog add tasks.
+            back this.backlog.
+        }
+
+        command enqueue(count tasks, count priority) : count {
+            this.backlog := this.backlog add tasks add priority.
+            back this.backlog.
+        }
+    }
+
+    module PriorityMissionQueue extends MissionQueue {
+        public telemetry count boost := 2.
+
+        command PriorityMissionQueue(count seed) : voidspace {
+            this.backlog := seed.
+        }
+
+        override command enqueue(count tasks) : count {
+            back super.enqueue(tasks add this.boost).
+        }
+    }
+
+    deploy PriorityMissionQueue queue(5).
+
+    transmit route(3).
+    transmit route(3, 4).
+    transmit queue.enqueue(2).
+    transmit queue.enqueue(2, 1).
+
+    telemetry count backlog_shadow := 77.
+    verify (1 == 1) {
+        telemetry count backlog_shadow := 500.
+        transmit backlog_shadow.
+    }
+    transmit backlog_shadow.
+
+    $$ ==========================================
+    $$ 9. FINAL SUMMARY
     $$ ==========================================
     
     status := 9999.

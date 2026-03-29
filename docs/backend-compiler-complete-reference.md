@@ -9,6 +9,19 @@ It is intentionally structured in four layers, exactly as requested:
 3. Full process flow + purpose of each file/process
 4. Deep, implementation-level documentation with line landmarks and subsystem behavior
 
+## March 30, 2026 Verification Notes
+
+This reference is still valid conceptually, with the following concrete updates verified against the active source:
+
+1. Main pipeline now includes C-like translation printing between optimized TAC and runtime execution:
+  - `tacGenerator.printCode(...)`
+  - `tacGenerator.printCTranslation(...)`
+  - `tacGenerator.execute()`
+2. C translation has been improved to preserve side-effecting call/method instructions and render visible argument lists at translated call sites.
+3. Scope-aware semantic checks are primarily implemented in parser helper/state logic; `symbol_table.cpp` remains a lightweight metadata store and reporter.
+4. For exact feature-to-line execution mapping (conditionals, loops, functions, classes/modules), use:
+  - `docs/compiler-feature-execution-map.md`
+
 ---
 
 ## 1) Easy Explanation (Simple Words)
@@ -100,6 +113,7 @@ AstroScript backend is a hybrid **compile + interpret** architecture:
 6. If parse status is success (`0`):
    - optimize TAC
    - print optimized TAC
+  - print C-like translation
    - execute TAC
    - print symbol table
 7. Process returns parse status.
@@ -671,6 +685,7 @@ A keyword becomes real behavior through this chain:
 - parses output into structured response:
   - output
   - IR
+  - C-like translation
   - diagnostics
 - frontend visualizes everything in editor + tabs.
 
@@ -681,8 +696,8 @@ A keyword becomes real behavior through this chain:
 Important current-state note:
 
 - This file currently contains a hardcoded constant:
-  - `const ASTROSCRIPT_COMPILER_TARGET = "linux"`
-- That means runtime target preference is forced to Linux in present code.
+  - `const ASTROSCRIPT_COMPILER_TARGET = "windows"`
+- That means runtime target preference is forced to Windows unless this constant is changed.
 - If you want environment-driven switching, replace hardcoding with env-driven input.
 
 ---

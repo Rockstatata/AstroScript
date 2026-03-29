@@ -2,12 +2,12 @@
 
 #include <iostream>
 
-bool SymbolTable::insert(const std::string& name, const std::string& type) {
+bool SymbolTable::insert(const std::string& name, const std::string& type, int declaredLine) {
     if (exists(name)) {
         return false;
     }
 
-    table[name] = Symbol{name, type, 0.0};
+    table[name] = Symbol{name, type, 0.0, declaredLine};
     return true;
 }
 
@@ -38,13 +38,25 @@ std::string SymbolTable::getType(const std::string& name) const {
     return "";
 }
 
+int SymbolTable::getDeclaredLine(const std::string& name) const {
+    auto it = table.find(name);
+    if (it != table.end()) {
+        return it->second.declaredLine;
+    }
+    return -1;
+}
+
 void SymbolTable::printTable() const {
     std::cout << "\n--- Symbol Table ---\n";
     for (const auto& entry : table) {
         const Symbol& symbol = entry.second;
         std::cout << "Name: " << symbol.name
                   << ", Type: " << symbol.type
-                  << ", Value: " << symbol.value << '\n';
+                  << ", Value: " << symbol.value;
+        if (symbol.declaredLine > 0) {
+            std::cout << ", DeclaredLine: " << symbol.declaredLine;
+        }
+        std::cout << '\n';
     }
     std::cout << "--------------------\n";
 }

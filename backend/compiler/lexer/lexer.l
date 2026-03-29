@@ -3,6 +3,7 @@
 
 %{
 #include <stdio.h>
+#include <ctype.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -67,6 +68,9 @@ STRING_LITERAL  \"([^\"\n])*\"
 "public"           { return PUBLIC; }
 "private"          { return PRIVATE; }
 "this"             { return THIS; }
+"new"              { return NEW; }
+"super"            { return SUPER; }
+"override"         { return OVERRIDE; }
 
 "telemetry"        { return TELEMETRY; }
 "limit"            { return LIMIT; }
@@ -149,6 +153,7 @@ STRING_LITERAL  \"([^\"\n])*\"
 ")"                { return RPAREN; }
 "["                { return LBRACKET; }
 "]"                { return RBRACKET; }
+"."/{LETTER}       { return MEMBER_DOT; }
 "."                { return DOT; }
 ","                { return COMMA; }
 ":"                { return COLON; }
@@ -180,7 +185,12 @@ STRING_LITERAL  \"([^\"\n])*\"
 [ \t\r\n]+         { }
 
 . {
-      printf("LEXICAL ERROR at line %d: %s\n", yylineno, yytext);
+     unsigned char ch = static_cast<unsigned char>(yytext[0]);
+     if (isprint(ch)) {
+        printf("LEXICAL ERROR at line %d: unexpected character '%c'. Use valid AstroScript keywords/operators only.\n", yylineno, ch);
+     } else {
+        printf("LEXICAL ERROR at line %d: invalid non-printable character (byte %u).\n", yylineno, static_cast<unsigned int>(ch));
+     }
   }
 
 %%

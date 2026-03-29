@@ -18,11 +18,11 @@ Source Code (.as)
 │  Parser  │  (Bison)
 │ parser.y │
 └────┬─────┘
-     │ AST / semantic actions
+     │ semantic actions + TAC emission
      ▼
 ┌────────────────┐
-│ Semantic Check │  (symbol_table.cpp)
-│ Symbol Table   │
+│ Semantic Check │  (parser.y + symbol_table.cpp)
+│ Symbol Metadata│
 └────┬───────────┘
      │
      ▼
@@ -38,6 +38,13 @@ Source Code (.as)
 │ - Const fold   │
 │ - Algebraic    │
 │ - Redundant mv │
+└────┬───────────┘
+     │
+     ▼
+┌────────────────┐
+│ C-Like Output  │
+│ Readable code  │
+│ for playground │
 └────┬───────────┘
      │
      ▼
@@ -70,11 +77,9 @@ LALR(1) parser that validates syntax and triggers semantic actions. Defines the 
 
 Files: `backend/compiler/semantic/symbol_table.h`, `symbol_table.cpp`
 
-Maintains a symbol table that tracks:
-- Variable names and types
-- Scope information
-- Duplicate declaration detection
-- Undeclared variable usage detection
+Maintains symbol metadata storage (name, type, declared line) and final symbol reporting.
+
+Important: scope-aware declaration checks and most semantic validation logic are implemented in `parser.y` (for example `declareScopedName`, `isDeclaredName`, overload resolution, module inheritance checks, and member access checks).
 
 ### 4. Intermediate Code Generation
 
@@ -94,7 +99,20 @@ Applied to TAC before execution:
 - **Algebraic simplification** — removes identity operations (x+0, x*1, etc.)
 - **Redundant move elimination** — removes self-assignments
 
-### 6. Execution
+### 6. C-Like Translation (Learning View)
+
+File: `backend/compiler/ir/tac.cpp`
+
+The backend now prints a readable C-like projection generated from optimized TAC.
+This output is designed for learning and playground comparison, so users can map AstroScript constructs to familiar C-style statements.
+
+Current behavior (March 30, 2026):
+- Function and method call arguments are now carried through into translated call sites.
+- Side-effecting calls are preserved in output even when temporary results are not reused.
+- Constructor/method invocation emitted after object creation now keeps the original argument list in translation.
+- The output remains a learning-focused pseudo-C projection, not a strict production transpiler.
+
+### 7. Execution
 
 The TAC interpreter executes the optimized instructions using a stack-based runtime with:
 - Call frames for function scope
@@ -113,3 +131,9 @@ backend/compiler/
 ├── main.cpp        # Compiler entry point
 └── build/          # Generated files and binary
 ```
+
+## Execution Map
+
+For exact lexer/parser/symbol/TAC line-by-line execution points for conditionals, loops, functions, and classes, see:
+
+- `docs/compiler-feature-execution-map.md`

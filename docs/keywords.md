@@ -8,7 +8,7 @@
 |     6 | `real`                         | `float`                              | Floating-point type                   |   |            |
 |     7 | `precise`                      | `double`                             | High-precision numeric type           |   |            |
 |     8 | `flag`                         | `bool`                               | Boolean signal type                   |   |            |
-|     9 | `symbol`                       | `char`                               | Single character type                 |   |            |
+|     9 | `symbol`                       | string literal / text                | Text value type                       |   |            |
 |    10 | `voidspace`                    | `void`                               | No return type                        |   |            |
 |    11 | `telemetry <type> <id>`        | variable                             | Mutable variable / class member       |   |            |
 |    12 | `limit <type> <id>`            | `const`                              | Immutable constant / const member     |   |            |
@@ -25,7 +25,7 @@
 |    23 | `else_verify (condition)`      | `else if`                            | Alternate condition                   |   |            |
 |    24 | `otherwise`                    | `else`                               | Default condition                     |   |            |
 |    25 | `orbit (condition)`            | `while`                              | Loop with condition                   |   |            |
-|    26 | `orbit times (i:c:u)`          | `for`                                | Planned / not in current parser       |   |            |
+|    26 | `orbit times (i:c:u)`          | `for`                                | Range-style loop                      |   |            |
 |    27 | `stage_sep`                    | `break`                              | Exit loop                             |   |            |
 |    28 | `coast`                        | `continue`                           | Skip loop iteration                   |   |            |
 |    29 | `scenario (expression)`        | `switch`                             | Multi-path decision                   |   |            |
@@ -66,15 +66,24 @@
 |    64 | `public`                       | public                               | Public access specifier               |   |            |
 |    65 | `private`                      | private                              | Private access specifier              |   |            |
 |    66 | `this`                         | `this`                               | Reference to current object           |   |            |
-|    67 | `fleet`                        | array                                | Collection of objects or values       |   |            |
-|    68 | `mode`                         | `enum`                               | Enumerated type                       |   |            |
-|    69 | `alias`                        | `typedef`                            | Type alias                            |   |            |
-|    70 | `{`                            | `{`                                  | Block start                           |   |            |
-|    71 | `}`                            | `}`                                  | Block end                             |   |            |
+|    67 | `super`                        | `super`                              | Reference to base module behavior     |   |            |
+|    68 | `override`                     | `override`                           | Explicit method override marker       |   |            |
+|    69 | `new`                          | `new`                                | Heap-style object creation expression |   |            |
+|    70 | `fleet`                        | array                                | Collection of objects or values       |   |            |
+|    71 | `mode`                         | `enum`                               | Enumerated type                       |   |            |
+|    72 | `alias`                        | `typedef`                            | Type alias                            |   |            |
+|    73 | `{`                            | `{`                                  | Block start                           |   |            |
+|    74 | `}`                            | `}`                                  | Block end                             |   |            |
+
+Notes:
+- Member access and calls are supported via dot notation: `obj.field`, `obj.method(...)`, `this.field`, `super.method(...)`.
+- The member-access dot must be directly followed by an identifier (no whitespace between `.` and member name).
+- Function and method overloading are resolved by argument count (arity).
+- Variables are block scoped; inner declarations can shadow outer variables.
 
 ### Current parser notes (progress-2)
 
 - Function definitions currently use `command name(...) : type { ... }`.
 - Relational operators in scripts are symbols (`<`, `>`, `<=`, `>=`, `==`, `!=`), not token names like `LT`/`GT`.
-- `.` is the statement terminator, so member access like `obj.field` is not currently supported in the parser.
-- `orbit` currently supports condition-style looping: `orbit (condition) { ... }`.
+- `.` remains the statement terminator; member access is supported using `obj.field`/`obj.method(...)` syntax.
+- `orbit` supports condition and range forms: `orbit (condition) { ... }` and `orbit times (i : start : upper) { ... }`.

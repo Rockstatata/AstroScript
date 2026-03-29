@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <algorithm>
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
@@ -15,6 +16,7 @@ int yylex();
 void yyerror(const char *s);
 extern FILE *yyin;
 extern int yylineno;
+extern char* yytext;
 
 SymbolTable symbolTable;
 TACGenerator tacGenerator;
@@ -25,6 +27,40 @@ struct ExprAttr {
     bool isConst;
     bool isIdentifier;
     std::string typeName;
+};
+
+struct FieldInfo {
+    std::string typeName;
+    bool isPublic;
+    bool isConstant;
+    bool hasDefault;
+    std::string defaultPlace;
+};
+
+struct MethodInfo {
+    std::string ownerModule;
+    std::string qualifiedName;
+    std::vector<std::string> parameterTypes;
+    std::string returnType;
+    bool isPublic;
+    bool isOverride;
+    bool isConstructor;
+    int arity;
+    std::string selector;
+};
+
+struct FunctionOverloadInfo {
+    std::string qualifiedName;
+    std::vector<std::string> parameterTypes;
+    std::string returnType;
+    int arity;
+};
+
+struct ModuleInfo {
+    std::string name;
+    std::string baseName;
+    std::unordered_map<std::string, FieldInfo> fields;
+    std::unordered_map<std::string, std::vector<MethodInfo>> methods;
 };
 
 struct IfContext {
@@ -52,16 +88,231 @@ std::vector<LoopContext> loopStack;
 std::vector<SwitchContext> switchStack;
 std::vector<std::string> currentFunctionParams;
 std::unordered_map<std::string, std::string> currentFunctionParamTypes;
+std::vector<std::string> currentFunctionParamTypesInOrder;
 std::string currentFunctionName;
+std::string currentFunctionQualifiedName;
 std::string currentFunctionReturnType = "VOIDSPACE";
 bool currentFunctionInModule = false;
+bool currentFunctionIsConstructor = false;
+bool currentFunctionIsMethod = false;
+std::string currentFunctionOwnerModule;
 std::unordered_map<std::string, int> functionArity;
 std::unordered_map<std::string, std::unordered_map<std::string, std::string>> functionParameterTypes;
 std::unordered_map<std::string, std::string> functionReturnTypes;
+std::unordered_map<std::string, std::vector<FunctionOverloadInfo>> globalFunctionOverloads;
 std::unordered_map<std::string, std::string> typeAliases;
 std::unordered_set<std::string> constantNames;
+std::unordered_map<std::string, ModuleInfo> moduleTable;
+std::vector<std::unordered_map<std::string, std::string>> variableScopes;
+std::vector<std::unordered_map<std::string, int>> variableScopeLines;
+std::vector<std::unordered_set<std::string>> constantScopes;
+std::string currentModuleName;
+bool currentClassMemberIsPublic = true;
+bool currentClassMemberIsOverride = false;
+std::string pendingModuleName;
 int moduleDepth = 0;
 bool currentFunctionSawValueReturn = false;
+
+std::string qualifyMethodName(const std::string& moduleName, const std::string& methodName) {
+    return moduleName + "::" + methodName;
+}
+
+std::string buildSelector(const std::string& methodName, int arity) {
+    return methodName + "#" + std::to_string(arity);
+}
+
+std::string buildQualifiedFunctionName(const std::string& owner, const std::string& functionName, int arity) {
+    if (!owner.empty()) {
+        return owner + "::" + functionName + "@" + std::to_string(arity);
+    }
+    return functionName + "@" + std::to_string(arity);
+}
+
+void pushScope() {
+    variableScopes.push_back({});
+    variableScopeLines.push_back({});
+    constantScopes.push_back({});
+}
+
+void popScope() {
+    if (!variableScopes.empty()) {
+        variableScopes.pop_back();
+    }
+    if (!variableScopeLines.empty()) {
+        variableScopeLines.pop_back();
+    }
+    if (!constantScopes.empty()) {
+        constantScopes.pop_back();
+    }
+}
+
+bool isDeclaredInCurrentScopeOnly(const std::string& name) {
+    if (variableScopes.empty()) {
+        return false;
+    }
+    return variableScopes.back().find(name) != variableScopes.back().end();
+}
+
+int declaredLineInCurrentScope(const std::string& name) {
+    if (variableScopeLines.empty()) {
+        return -1;
+    }
+
+    auto lineIt = variableScopeLines.back().find(name);
+    if (lineIt == variableScopeLines.back().end()) {
+        return -1;
+    }
+
+    return lineIt->second;
+}
+
+void reportRedeclaration(const std::string& name) {
+    int previousLine = declaredLineInCurrentScope(name);
+    if (previousLine > 0) {
+        printf("Semantic Error at line %d: variable %s already declared in this scope at line %d\n", yylineno, name.c_str(), previousLine);
+    } else {
+        printf("Semantic Error at line %d: variable %s already declared\n", yylineno, name.c_str());
+    }
+}
+
+bool declareScopedName(const std::string& name, const std::string& typeName, bool isConstant, int lineNumber) {
+    if (isDeclaredInCurrentScopeOnly(name)) {
+        return false;
+    }
+
+    if (variableScopes.empty()) {
+        pushScope();
+    }
+
+    variableScopes.back()[name] = typeName;
+    variableScopeLines.back()[name] = lineNumber;
+    if (isConstant) {
+        constantScopes.back().insert(name);
+        constantNames.insert(name);
+    }
+
+    if (!symbolTable.exists(name)) {
+        symbolTable.insert(name, typeName, lineNumber);
+    }
+
+    return true;
+}
+
+bool isConstantName(const std::string& name) {
+    for (auto scopeIt = constantScopes.rbegin(); scopeIt != constantScopes.rend(); ++scopeIt) {
+        if (scopeIt->find(name) != scopeIt->end()) {
+            return true;
+        }
+    }
+    return constantNames.find(name) != constantNames.end();
+}
+
+bool isModuleKnown(const std::string& moduleName) {
+    return moduleTable.find(moduleName) != moduleTable.end();
+}
+
+bool isModuleType(const std::string& typeName) {
+    return typeName.rfind("MODULE:", 0) == 0;
+}
+
+std::string moduleNameFromType(const std::string& typeName) {
+    if (!isModuleType(typeName)) {
+        return "";
+    }
+    return typeName.substr(std::string("MODULE:").size());
+}
+
+bool isDerivedFrom(const std::string& childModule, const std::string& parentModule) {
+    if (childModule.empty() || parentModule.empty()) {
+        return false;
+    }
+
+    std::string cursor = childModule;
+    while (!cursor.empty()) {
+        if (cursor == parentModule) {
+            return true;
+        }
+        auto moduleIt = moduleTable.find(cursor);
+        if (moduleIt == moduleTable.end()) {
+            break;
+        }
+        cursor = moduleIt->second.baseName;
+    }
+
+    return false;
+}
+
+bool resolveFieldInHierarchy(const std::string& moduleName,
+                            const std::string& fieldName,
+                            FieldInfo& resolvedField,
+                            std::string& ownerModule) {
+    std::string cursor = moduleName;
+    while (!cursor.empty()) {
+        auto moduleIt = moduleTable.find(cursor);
+        if (moduleIt == moduleTable.end()) {
+            break;
+        }
+        auto fieldIt = moduleIt->second.fields.find(fieldName);
+        if (fieldIt != moduleIt->second.fields.end()) {
+            resolvedField = fieldIt->second;
+            ownerModule = cursor;
+            return true;
+        }
+        cursor = moduleIt->second.baseName;
+    }
+    return false;
+}
+
+bool resolveMethodInHierarchy(const std::string& moduleName,
+                             const std::string& methodName,
+                             int argumentCount,
+                             MethodInfo& resolvedMethod,
+                             std::string& ownerModule) {
+    std::string cursor = moduleName;
+    while (!cursor.empty()) {
+        auto moduleIt = moduleTable.find(cursor);
+        if (moduleIt == moduleTable.end()) {
+            break;
+        }
+        auto methodGroupIt = moduleIt->second.methods.find(methodName);
+        if (methodGroupIt != moduleIt->second.methods.end()) {
+            for (const MethodInfo& candidate : methodGroupIt->second) {
+                if (candidate.arity == argumentCount) {
+                    resolvedMethod = candidate;
+                    ownerModule = cursor;
+                    return true;
+                }
+            }
+        }
+        cursor = moduleIt->second.baseName;
+    }
+    return false;
+}
+
+bool resolveGlobalFunctionOverload(const std::string& functionName,
+                                  int argumentCount,
+                                  FunctionOverloadInfo& resolved) {
+    auto functionIt = globalFunctionOverloads.find(functionName);
+    if (functionIt == globalFunctionOverloads.end()) {
+        return false;
+    }
+
+    for (const FunctionOverloadInfo& overload : functionIt->second) {
+        if (overload.arity == argumentCount) {
+            resolved = overload;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool canAccessMember(bool isPublicMember, const std::string& ownerModule) {
+    if (isPublicMember) {
+        return true;
+    }
+    return currentFunctionInModule && currentFunctionOwnerModule == ownerModule;
+}
 
 bool isParameterName(const std::string& name) {
     for (const std::string& param : currentFunctionParams) {
@@ -73,7 +324,17 @@ bool isParameterName(const std::string& name) {
 }
 
 bool isDeclaredName(const std::string& name) {
-    return symbolTable.exists(name) || isParameterName(name);
+    if (isParameterName(name)) {
+        return true;
+    }
+
+    for (auto scopeIt = variableScopes.rbegin(); scopeIt != variableScopes.rend(); ++scopeIt) {
+        if (scopeIt->find(name) != scopeIt->end()) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 std::string baseType(const std::string& typeName) {
@@ -114,8 +375,11 @@ std::string declaredTypeOf(const std::string& name) {
         return paramIt->second;
     }
 
-    if (symbolTable.exists(name)) {
-        return symbolTable.getType(name);
+    for (auto scopeIt = variableScopes.rbegin(); scopeIt != variableScopes.rend(); ++scopeIt) {
+        auto valueIt = scopeIt->find(name);
+        if (valueIt != scopeIt->end()) {
+            return valueIt->second;
+        }
     }
 
     return "UNKNOWN";
@@ -131,6 +395,12 @@ bool areTypesCompatible(const std::string& targetType, const std::string& source
 
     if (target == source) {
         return true;
+    }
+
+    if (isModuleType(target) && isModuleType(source)) {
+        const std::string targetModule = moduleNameFromType(target);
+        const std::string sourceModule = moduleNameFromType(source);
+        return isDerivedFrom(sourceModule, targetModule);
     }
 
     if (isNumericType(target) && isNumericType(source)) {
@@ -168,7 +438,7 @@ ExprAttr* makeNumericExpr(double value) {
 }
 
 %token MISSION LAUNCH SUCCESS ABORT
-%token MODULE DEPLOY EXTENDS PUBLIC PRIVATE THIS
+%token MODULE DEPLOY EXTENDS PUBLIC PRIVATE THIS NEW SUPER OVERRIDE
 %token TELEMETRY LIMIT ALIAS FLEET MODE
 %token COMMAND BACK TRANSMIT
 %token BROADCAST RECEIVE ALARM
@@ -190,7 +460,7 @@ ExprAttr* makeNumericExpr(double value) {
 
 %token LBRACKET RBRACKET
 %token LBRACE RBRACE LPAREN RPAREN
-%token DOT COMMA COLON
+%token MEMBER_DOT DOT COMMA COLON
 
 %token <intval> INT_LITERAL
 %token <floatval> FLOAT_LITERAL
@@ -198,8 +468,11 @@ ExprAttr* makeNumericExpr(double value) {
 
 %type <str> type
 %type <expr> expression
+%type <expr> field_initializer
 %type <intval> argument_list argument_list_opt
 %type <intval> parameter_list parameter_list_opt
+
+%error-verbose
 
 %nonassoc LOWER_THAN_ELSE
 %nonassoc ELSE_VERIFY OTHERWISE
@@ -222,7 +495,16 @@ mission_block
     ;
 
 block
-    : LBRACE statement_list RBRACE
+    : LBRACE
+      {
+          pushScope();
+          tacGenerator.emitScopeBegin();
+      }
+      statement_list RBRACE
+      {
+          tacGenerator.emitScopeEnd();
+          popScope();
+      }
     ;
 
 statement_list
@@ -264,6 +546,11 @@ statement
               printf("Semantic Error at line %d: coast used outside loop\n", yylineno);
           }
       }
+    | error DOT
+      {
+          printf("SYNTAX ERROR at line %d: invalid statement; skipped until '.' to continue parsing\n", yylineno);
+          yyerrok;
+      }
     | return_statement
     | ABORT DOT
     ;
@@ -271,19 +558,17 @@ statement
 declaration
     : TELEMETRY type IDENTIFIER DOT
       {
-          if (symbolTable.exists($3)) {
-              printf("Semantic Error at line %d: variable %s already declared\n", yylineno, $3);
+          if (!declareScopedName($3, $2, false, yylineno)) {
+              reportRedeclaration($3);
           } else {
-              symbolTable.insert($3, $2);
               tacGenerator.emitDeclare($2, $3);
           }
       }
     | TELEMETRY type IDENTIFIER ASSIGN expression DOT
       {
-          if (symbolTable.exists($3)) {
-              printf("Semantic Error at line %d: variable %s already declared\n", yylineno, $3);
+          if (!declareScopedName($3, $2, false, yylineno)) {
+              reportRedeclaration($3);
           } else {
-              symbolTable.insert($3, $2);
               tacGenerator.emitDeclare($2, $3);
               if (!areTypesCompatible($2, $5->typeName)) {
                   printf("Semantic Error at line %d: cannot initialize %s (%s) with %s\n", yylineno, $3, $2, $5->typeName.c_str());
@@ -294,11 +579,9 @@ declaration
       }
     | LIMIT type IDENTIFIER ASSIGN expression DOT
       {
-          if (symbolTable.exists($3)) {
-              printf("Semantic Error at line %d: variable %s already declared\n", yylineno, $3);
+          if (!declareScopedName($3, $2, true, yylineno)) {
+              reportRedeclaration($3);
           } else {
-              symbolTable.insert($3, $2);
-              constantNames.insert($3);
               tacGenerator.emitDeclare($2, $3);
               if (!areTypesCompatible($2, $5->typeName)) {
                   printf("Semantic Error at line %d: cannot initialize constant %s (%s) with %s\n", yylineno, $3, $2, $5->typeName.c_str());
@@ -313,29 +596,29 @@ declaration
       }
     | FLEET type IDENTIFIER DOT
       {
-          if (symbolTable.exists($3)) {
-              printf("Semantic Error at line %d: variable %s already declared\n", yylineno, $3);
+          const std::string arrayType = std::string($2) + "[]";
+          if (!declareScopedName($3, arrayType, false, yylineno)) {
+              reportRedeclaration($3);
           } else {
-              symbolTable.insert($3, std::string($2) + "[]");
               tacGenerator.emitArrayDecl($2, $3, "0");
           }
       }
     | MODE IDENTIFIER LBRACE mode_body RBRACE
     | TELEMETRY type IDENTIFIER LBRACKET INT_LITERAL RBRACKET DOT
       {
-          if (symbolTable.exists($3)) {
-              printf("Semantic Error at line %d: variable %s already declared\n", yylineno, $3);
+          const std::string arrayType = std::string($2) + "[]";
+          if (!declareScopedName($3, arrayType, false, yylineno)) {
+              reportRedeclaration($3);
           } else {
-              symbolTable.insert($3, std::string($2) + "[]");
               tacGenerator.emitArrayDecl($2, $3, toText(static_cast<double>($5)));
           }
       }
     | TELEMETRY type IDENTIFIER LBRACKET INT_LITERAL RBRACKET ASSIGN expression DOT
       {
-          if (symbolTable.exists($3)) {
-              printf("Semantic Error at line %d: variable %s already declared\n", yylineno, $3);
+          const std::string arrayType = std::string($2) + "[]";
+          if (!declareScopedName($3, arrayType, false, yylineno)) {
+              reportRedeclaration($3);
           } else {
-              symbolTable.insert($3, std::string($2) + "[]");
               tacGenerator.emitArrayDecl($2, $3, toText(static_cast<double>($5)));
               tacGenerator.emitArrayStore($3, "0", $8->place);
           }
@@ -347,8 +630,27 @@ assignment
     : IDENTIFIER ASSIGN expression DOT
       {
           if (!isDeclaredName($1)) {
-              printf("Semantic Error at line %d: variable %s not declared\n", yylineno, $1);
-          } else if (constantNames.find($1) != constantNames.end()) {
+              if (currentFunctionInModule) {
+                  FieldInfo fieldInfo;
+                  std::string ownerModule;
+                  if (resolveFieldInHierarchy(currentFunctionOwnerModule, $1, fieldInfo, ownerModule)) {
+                      if (!canAccessMember(fieldInfo.isPublic, ownerModule)) {
+                          printf("Semantic Error at line %d: field %s is private in module %s\n", yylineno, $1, ownerModule.c_str());
+                      } else if (fieldInfo.isConstant) {
+                          printf("Semantic Error at line %d: cannot assign to constant field %s\n", yylineno, $1);
+                      } else {
+                          if (!areTypesCompatible(fieldInfo.typeName, $3->typeName)) {
+                              printf("Semantic Error at line %d: type mismatch assigning %s to field %s (%s)\n", yylineno, $3->typeName.c_str(), $1, fieldInfo.typeName.c_str());
+                          }
+                          tacGenerator.emitFieldStore("this", $1, $3->place);
+                      }
+                  } else {
+                      printf("Semantic Error at line %d: variable %s not declared\n", yylineno, $1);
+                  }
+              } else {
+                  printf("Semantic Error at line %d: variable %s not declared\n", yylineno, $1);
+              }
+          } else if (isConstantName($1)) {
               printf("Semantic Error at line %d: cannot assign to constant %s\n", yylineno, $1);
           } else {
               std::string destinationType = declaredTypeOf($1);
@@ -358,6 +660,56 @@ assignment
               tacGenerator.emitAssign($1, $3->place);
           }
           delete $3;
+      }
+    | IDENTIFIER MEMBER_DOT IDENTIFIER ASSIGN expression DOT
+      {
+          if (!isDeclaredName($1)) {
+              printf("Semantic Error at line %d: object %s not declared\n", yylineno, $1);
+          } else {
+              std::string objectType = declaredTypeOf($1);
+              if (!isModuleType(objectType)) {
+                  printf("Semantic Error at line %d: %s is not an object instance\n", yylineno, $1);
+              } else {
+                  const std::string objectModule = moduleNameFromType(objectType);
+                  FieldInfo fieldInfo;
+                  std::string ownerModule;
+                  if (!resolveFieldInHierarchy(objectModule, $3, fieldInfo, ownerModule)) {
+                      printf("Semantic Error at line %d: field %s not found in module %s\n", yylineno, $3, objectModule.c_str());
+                  } else if (!canAccessMember(fieldInfo.isPublic, ownerModule)) {
+                      printf("Semantic Error at line %d: field %s is private in module %s\n", yylineno, $3, ownerModule.c_str());
+                  } else if (fieldInfo.isConstant) {
+                      printf("Semantic Error at line %d: cannot assign to constant field %s\n", yylineno, $3);
+                  } else {
+                      if (!areTypesCompatible(fieldInfo.typeName, $5->typeName)) {
+                          printf("Semantic Error at line %d: type mismatch assigning %s to field %s (%s)\n", yylineno, $5->typeName.c_str(), $3, fieldInfo.typeName.c_str());
+                      }
+                      tacGenerator.emitFieldStore($1, $3, $5->place);
+                  }
+              }
+          }
+          delete $5;
+      }
+    | THIS MEMBER_DOT IDENTIFIER ASSIGN expression DOT
+      {
+          if (!currentFunctionInModule) {
+              printf("Semantic Error at line %d: this used outside module function context\n", yylineno);
+          } else {
+              FieldInfo fieldInfo;
+              std::string ownerModule;
+              if (!resolveFieldInHierarchy(currentFunctionOwnerModule, $3, fieldInfo, ownerModule)) {
+                  printf("Semantic Error at line %d: field %s not found in module %s\n", yylineno, $3, currentFunctionOwnerModule.c_str());
+              } else if (!canAccessMember(fieldInfo.isPublic, ownerModule)) {
+                  printf("Semantic Error at line %d: field %s is private in module %s\n", yylineno, $3, ownerModule.c_str());
+              } else if (fieldInfo.isConstant) {
+                  printf("Semantic Error at line %d: cannot assign to constant field %s\n", yylineno, $3);
+              } else {
+                  if (!areTypesCompatible(fieldInfo.typeName, $5->typeName)) {
+                      printf("Semantic Error at line %d: type mismatch assigning %s to field %s (%s)\n", yylineno, $5->typeName.c_str(), $3, fieldInfo.typeName.c_str());
+                  }
+                  tacGenerator.emitFieldStore("this", $3, $5->place);
+              }
+          }
+          delete $5;
       }
     | IDENTIFIER LBRACKET expression RBRACKET ASSIGN expression DOT
       {
@@ -379,20 +731,64 @@ assignment
 deploy_statement
     : DEPLOY IDENTIFIER IDENTIFIER DOT
       {
-          if (symbolTable.exists($3)) {
-              printf("Semantic Error at line %d: variable %s already declared\n", yylineno, $3);
+          const std::string deployedType = std::string("MODULE:") + $2;
+          if (!isModuleKnown($2)) {
+              printf("Semantic Error at line %d: module %s is not defined\n", yylineno, $2);
+          } else if (!declareScopedName($3, deployedType, false, yylineno)) {
+              reportRedeclaration($3);
           } else {
-              symbolTable.insert($3, std::string("MODULE:") + $2);
-              tacGenerator.emitDeclare("MODULE", $3);
+              tacGenerator.emitDeclare(deployedType, $3);
+              tacGenerator.emitObjectNew($2, $3);
+
+              MethodInfo ctorInfo;
+              std::string ctorOwner;
+              if (resolveMethodInHierarchy($2, $2, 0, ctorInfo, ctorOwner)) {
+                  std::string initTemp = tacGenerator.emitMethodCall($3, ctorInfo.selector, 0);
+                  (void)initTemp;
+              }
+          }
+      }
+    | DEPLOY IDENTIFIER IDENTIFIER LPAREN argument_list_opt RPAREN DOT
+      {
+          const std::string deployedType = std::string("MODULE:") + $2;
+          if (!isModuleKnown($2)) {
+              printf("Semantic Error at line %d: module %s is not defined\n", yylineno, $2);
+          } else if (!declareScopedName($3, deployedType, false, yylineno)) {
+              reportRedeclaration($3);
+          } else {
+              tacGenerator.emitDeclare(deployedType, $3);
+              tacGenerator.emitObjectNew($2, $3);
+
+              MethodInfo ctorInfo;
+              std::string ctorOwner;
+              if (resolveMethodInHierarchy($2, $2, $5, ctorInfo, ctorOwner)) {
+                  if (ctorInfo.arity != $5) {
+                      printf("Semantic Error at line %d: constructor %s expects %d arguments but got %d\n", yylineno, $2, static_cast<int>(ctorInfo.parameterTypes.size()), $5);
+                  }
+                  std::string initTemp = tacGenerator.emitMethodCall($3, ctorInfo.selector, $5);
+                  (void)initTemp;
+              } else if ($5 != 0) {
+                  printf("Semantic Error at line %d: module %s has no constructor accepting %d arguments\n", yylineno, $2, $5);
+              }
           }
       }
     | DEPLOY IDENTIFIER DOT
       {
-          if (symbolTable.exists($2)) {
-              printf("Semantic Error at line %d: variable %s already declared\n", yylineno, $2);
+          const std::string deployedType = std::string("MODULE:") + $2;
+          if (!isModuleKnown($2)) {
+              printf("Semantic Error at line %d: module %s is not defined\n", yylineno, $2);
+          } else if (!declareScopedName($2, deployedType, false, yylineno)) {
+              reportRedeclaration($2);
           } else {
-              symbolTable.insert($2, "MODULE");
-              tacGenerator.emitDeclare("MODULE", $2);
+              tacGenerator.emitDeclare(deployedType, $2);
+              tacGenerator.emitObjectNew($2, $2);
+
+              MethodInfo ctorInfo;
+              std::string ctorOwner;
+              if (resolveMethodInHierarchy($2, $2, 0, ctorInfo, ctorOwner)) {
+                  std::string initTemp = tacGenerator.emitMethodCall($2, ctorInfo.selector, 0);
+                  (void)initTemp;
+              }
           }
       }
     ;
@@ -420,7 +816,7 @@ input_stmt
       {
           if (!isDeclaredName($2)) {
               printf("Semantic Error at line %d: variable %s not declared\n", yylineno, $2);
-          } else if (constantNames.find($2) != constantNames.end()) {
+          } else if (isConstantName($2)) {
               printf("Semantic Error at line %d: cannot receive input into constant %s\n", yylineno, $2);
           } else {
               tacGenerator.emitInput($2);
@@ -480,14 +876,32 @@ type
     | IDENTIFIER
       {
           auto aliasIt = typeAliases.find($1);
-          if (aliasIt == typeAliases.end()) {
-              printf("Semantic Error at line %d: unknown type alias %s\n", yylineno, $1);
-              $$ = strdup("COUNT");
-          } else {
+                    if (aliasIt != typeAliases.end()) {
               $$ = strdup(aliasIt->second.c_str());
+                    } else if (isModuleKnown($1)) {
+                            std::string moduleType = std::string("MODULE:") + $1;
+                            $$ = strdup(moduleType.c_str());
+                    } else {
+                            printf("Semantic Error at line %d: unknown type alias/module %s\n", yylineno, $1);
+                            $$ = strdup("COUNT");
           }
       }
     ;
+
+field_initializer
+        : INT_LITERAL
+            {
+                    $$ = makeExpr(toText(static_cast<double>($1)), static_cast<double>($1), true, false, "COUNT");
+            }
+        | FLOAT_LITERAL
+            {
+                    $$ = makeExpr(toText($1), $1, true, false, "REAL");
+            }
+        | STRING_LITERAL
+            {
+                    $$ = makeExpr($1, 0.0, true, false, "SYMBOL");
+            }
+        ;
 
 control_statement
     : VERIFY LPAREN expression RPAREN
@@ -663,17 +1077,53 @@ wait_statement
 module_definition
     : MODULE IDENTIFIER
       {
+          pendingModuleName = $2;
+
+          if (isModuleKnown($2)) {
+              printf("Semantic Error at line %d: module %s already defined\n", yylineno, $2);
+          } else {
+              ModuleInfo moduleInfo;
+              moduleInfo.name = $2;
+              moduleTable[$2] = moduleInfo;
+          }
+
           ++moduleDepth;
+          currentModuleName = $2;
+          currentClassMemberIsPublic = true;
+          currentClassMemberIsOverride = false;
       }
       inheritance LBRACE class_body RBRACE
       {
+          const auto moduleIt = moduleTable.find(currentModuleName);
+          if (moduleIt != moduleTable.end()) {
+              tacGenerator.registerClass(moduleIt->second.name, moduleIt->second.baseName);
+          }
+
           --moduleDepth;
+          currentModuleName.clear();
+          pendingModuleName.clear();
+          currentClassMemberIsPublic = true;
+          currentClassMemberIsOverride = false;
       }
     ;
 
 inheritance
     : EXTENDS IDENTIFIER
+      {
+          auto currentModuleIt = moduleTable.find(pendingModuleName);
+          if (currentModuleIt == moduleTable.end()) {
+              printf("Semantic Error at line %d: invalid module inheritance context for %s\n", yylineno, pendingModuleName.c_str());
+          } else if (!isModuleKnown($2)) {
+              printf("Semantic Error at line %d: base module %s is not defined\n", yylineno, $2);
+          } else if (std::string($2) == pendingModuleName || isDerivedFrom($2, pendingModuleName)) {
+              printf("Semantic Error at line %d: cyclic inheritance involving %s and %s\n", yylineno, pendingModuleName.c_str(), $2);
+          } else {
+              currentModuleIt->second.baseName = $2;
+          }
+      }
     |
+      {
+      }
     ;
 
 class_body
@@ -682,9 +1132,92 @@ class_body
     ;
 
 class_member
-    : declaration
-    | PUBLIC declaration
-    | PRIVATE declaration
+    :
+      {
+          currentClassMemberIsPublic = true;
+          currentClassMemberIsOverride = false;
+      }
+      class_member_core
+    | PUBLIC
+      {
+          currentClassMemberIsPublic = true;
+          currentClassMemberIsOverride = false;
+      }
+      class_member_core
+    | PRIVATE
+      {
+          currentClassMemberIsPublic = false;
+          currentClassMemberIsOverride = false;
+      }
+      class_member_core
+    | OVERRIDE
+      {
+          currentClassMemberIsPublic = true;
+          currentClassMemberIsOverride = true;
+      }
+      function_definition
+    | PUBLIC OVERRIDE
+      {
+          currentClassMemberIsPublic = true;
+          currentClassMemberIsOverride = true;
+      }
+      function_definition
+    | PRIVATE OVERRIDE
+      {
+          currentClassMemberIsPublic = false;
+          currentClassMemberIsOverride = true;
+      }
+      function_definition
+    ;
+
+class_member_core
+    : TELEMETRY type IDENTIFIER DOT
+      {
+          auto moduleIt = moduleTable.find(currentModuleName);
+          if (moduleIt == moduleTable.end()) {
+              printf("Semantic Error at line %d: invalid field declaration context for %s\n", yylineno, $3);
+          } else if (moduleIt->second.fields.find($3) != moduleIt->second.fields.end()) {
+              printf("Semantic Error at line %d: field %s already defined in module %s\n", yylineno, $3, currentModuleName.c_str());
+          } else {
+              FieldInfo fieldInfo{$2, currentClassMemberIsPublic, false, false, ""};
+              moduleIt->second.fields[$3] = fieldInfo;
+              tacGenerator.registerField(currentModuleName, $3, "0");
+          }
+      }
+    | TELEMETRY type IDENTIFIER ASSIGN field_initializer DOT
+      {
+          auto moduleIt = moduleTable.find(currentModuleName);
+          if (moduleIt == moduleTable.end()) {
+              printf("Semantic Error at line %d: invalid field declaration context for %s\n", yylineno, $3);
+          } else if (moduleIt->second.fields.find($3) != moduleIt->second.fields.end()) {
+              printf("Semantic Error at line %d: field %s already defined in module %s\n", yylineno, $3, currentModuleName.c_str());
+          } else {
+              if (!areTypesCompatible($2, $5->typeName)) {
+                  printf("Semantic Error at line %d: cannot initialize field %s (%s) with %s\n", yylineno, $3, $2, $5->typeName.c_str());
+              }
+              FieldInfo fieldInfo{$2, currentClassMemberIsPublic, false, true, $5->place};
+              moduleIt->second.fields[$3] = fieldInfo;
+              tacGenerator.registerField(currentModuleName, $3, $5->place);
+          }
+          delete $5;
+      }
+    | LIMIT type IDENTIFIER ASSIGN field_initializer DOT
+      {
+          auto moduleIt = moduleTable.find(currentModuleName);
+          if (moduleIt == moduleTable.end()) {
+              printf("Semantic Error at line %d: invalid field declaration context for %s\n", yylineno, $3);
+          } else if (moduleIt->second.fields.find($3) != moduleIt->second.fields.end()) {
+              printf("Semantic Error at line %d: field %s already defined in module %s\n", yylineno, $3, currentModuleName.c_str());
+          } else {
+              if (!areTypesCompatible($2, $5->typeName)) {
+                  printf("Semantic Error at line %d: cannot initialize constant field %s (%s) with %s\n", yylineno, $3, $2, $5->typeName.c_str());
+              }
+              FieldInfo fieldInfo{$2, currentClassMemberIsPublic, true, true, $5->place};
+              moduleIt->second.fields[$3] = fieldInfo;
+              tacGenerator.registerField(currentModuleName, $3, $5->place);
+          }
+          delete $5;
+      }
     | function_definition
     ;
 
@@ -694,19 +1227,109 @@ function_definition
           currentFunctionName = $2;
           currentFunctionParams.clear();
           currentFunctionParamTypes.clear();
+          currentFunctionParamTypesInOrder.clear();
           currentFunctionInModule = moduleDepth > 0;
           currentFunctionSawValueReturn = false;
+          currentFunctionOwnerModule = currentFunctionInModule ? currentModuleName : "";
+          currentFunctionIsMethod = currentFunctionInModule;
+          currentFunctionIsConstructor = currentFunctionInModule && (currentFunctionName == currentModuleName);
+          currentFunctionQualifiedName.clear();
       }
       parameter_list_opt RPAREN return_type type
       {
-          functionArity[currentFunctionName] = $5;
-          functionParameterTypes[currentFunctionName] = currentFunctionParamTypes;
-          functionReturnTypes[currentFunctionName] = $8;
-          currentFunctionReturnType = $8;
-          if (currentFunctionInModule) {
-              currentFunctionParamTypes["this"] = "MODULE";
+          if (currentFunctionIsConstructor && std::string($8) != "VOIDSPACE") {
+              printf("Semantic Error at line %d: constructor %s must have return type voidspace\n", yylineno, currentFunctionName.c_str());
           }
-          tacGenerator.emitFunctionBegin(currentFunctionName);
+
+          currentFunctionQualifiedName = buildQualifiedFunctionName(
+              currentFunctionInModule ? currentFunctionOwnerModule : "",
+              currentFunctionName,
+              $5);
+
+          functionArity[currentFunctionQualifiedName] = currentFunctionIsMethod ? ($5 + 1) : $5;
+          functionParameterTypes[currentFunctionQualifiedName] = currentFunctionParamTypes;
+          functionReturnTypes[currentFunctionQualifiedName] = $8;
+          currentFunctionReturnType = $8;
+
+          if (currentFunctionInModule) {
+              currentFunctionParamTypes["this"] = std::string("MODULE:") + currentFunctionOwnerModule;
+
+              auto moduleIt = moduleTable.find(currentFunctionOwnerModule);
+              if (moduleIt == moduleTable.end()) {
+                  printf("Semantic Error at line %d: invalid module function context for %s\n", yylineno, currentFunctionName.c_str());
+              } else {
+                  const std::string& baseModule = moduleIt->second.baseName;
+                  MethodInfo inheritedMethod;
+                  std::string inheritedOwner;
+                  bool hasInheritedMethod = false;
+                  if (!baseModule.empty()) {
+                      hasInheritedMethod = resolveMethodInHierarchy(baseModule, currentFunctionName, $5, inheritedMethod, inheritedOwner);
+                  }
+
+                  if (currentClassMemberIsOverride && !hasInheritedMethod) {
+                      printf("Semantic Error at line %d: method %s marked override but no base method exists\n", yylineno, currentFunctionName.c_str());
+                  }
+
+                  if (hasInheritedMethod && currentClassMemberIsOverride) {
+                      if (inheritedMethod.arity != $5) {
+                          printf("Semantic Error at line %d: override of %s has mismatched parameter count\n", yylineno, currentFunctionName.c_str());
+                      }
+                  }
+
+                  MethodInfo methodInfo;
+                  methodInfo.ownerModule = currentFunctionOwnerModule;
+                  methodInfo.qualifiedName = currentFunctionQualifiedName;
+                  methodInfo.parameterTypes = currentFunctionParamTypesInOrder;
+                  methodInfo.returnType = $8;
+                  methodInfo.isPublic = currentClassMemberIsPublic;
+                  methodInfo.isOverride = currentClassMemberIsOverride;
+                  methodInfo.isConstructor = currentFunctionIsConstructor;
+                  methodInfo.arity = $5;
+                  methodInfo.selector = buildSelector(currentFunctionName, $5);
+
+                  std::vector<MethodInfo>& overloads = moduleIt->second.methods[currentFunctionName];
+                  bool duplicateSignature = false;
+                  for (const MethodInfo& existing : overloads) {
+                      if (existing.arity == methodInfo.arity) {
+                          duplicateSignature = true;
+                          break;
+                      }
+                  }
+
+                  if (duplicateSignature) {
+                      printf("Semantic Error at line %d: method %s with %d parameters already defined in module %s\n", yylineno, currentFunctionName.c_str(), $5, currentFunctionOwnerModule.c_str());
+                  } else {
+                      overloads.push_back(methodInfo);
+                      tacGenerator.registerMethod(currentFunctionOwnerModule, methodInfo.selector, currentFunctionQualifiedName);
+                  }
+              }
+          } else {
+              FunctionOverloadInfo overloadInfo;
+              overloadInfo.qualifiedName = currentFunctionQualifiedName;
+              overloadInfo.parameterTypes = currentFunctionParamTypesInOrder;
+              overloadInfo.returnType = $8;
+              overloadInfo.arity = $5;
+
+              std::vector<FunctionOverloadInfo>& overloads = globalFunctionOverloads[currentFunctionName];
+              bool duplicateSignature = false;
+              for (const FunctionOverloadInfo& existing : overloads) {
+                  if (existing.arity == overloadInfo.arity) {
+                      duplicateSignature = true;
+                      break;
+                  }
+              }
+
+              if (duplicateSignature) {
+                  printf("Semantic Error at line %d: function %s with %d parameters already defined\n", yylineno, currentFunctionName.c_str(), $5);
+              } else {
+                  overloads.push_back(overloadInfo);
+              }
+          }
+
+          tacGenerator.emitFunctionBegin(currentFunctionQualifiedName);
+          if (currentFunctionIsMethod) {
+              tacGenerator.emitParamDef("this");
+          }
           for (const std::string& parameterName : currentFunctionParams) {
               tacGenerator.emitParamDef(parameterName);
           }
@@ -718,12 +1341,19 @@ function_definition
               printf("Semantic Error at line %d: function %s may exit without explicit back value\n", yylineno, currentFunctionName.c_str());
           }
           tacGenerator.emitFunctionReturn();
-          tacGenerator.emitFunctionEnd(currentFunctionName);
+                    tacGenerator.emitFunctionEnd(currentFunctionQualifiedName);
           currentFunctionParams.clear();
           currentFunctionParamTypes.clear();
+                    currentFunctionParamTypesInOrder.clear();
           currentFunctionReturnType = "VOIDSPACE";
+                    currentFunctionName.clear();
+                    currentFunctionQualifiedName.clear();
+                    currentFunctionOwnerModule.clear();
+                    currentFunctionIsConstructor = false;
+                    currentFunctionIsMethod = false;
           currentFunctionInModule = false;
                     currentFunctionSawValueReturn = false;
+                    currentClassMemberIsOverride = false;
       }
     ;
 
@@ -753,6 +1383,7 @@ parameter
       {
           currentFunctionParams.push_back($2);
                     currentFunctionParamTypes[$2] = $1;
+                    currentFunctionParamTypesInOrder.push_back($1);
       }
     ;
 
@@ -1050,6 +1681,30 @@ expression
           $$ = makeExpr(place, 0.0, false, false, "FLAG");
           delete $3;
       }
+    | NEW IDENTIFIER LPAREN argument_list_opt RPAREN
+      {
+          if (!isModuleKnown($2)) {
+              printf("Semantic Error at line %d: module %s is not defined\n", yylineno, $2);
+              $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+          } else {
+              std::string objectTemp = tacGenerator.newTemp();
+              tacGenerator.emitObjectNew($2, objectTemp);
+
+              MethodInfo ctorInfo;
+              std::string ctorOwner;
+              if (resolveMethodInHierarchy($2, $2, $4, ctorInfo, ctorOwner)) {
+                  if (ctorInfo.arity != $4) {
+                      printf("Semantic Error at line %d: constructor %s expects %d arguments but got %d\n", yylineno, $2, static_cast<int>(ctorInfo.parameterTypes.size()), $4);
+                  }
+                  std::string initTemp = tacGenerator.emitMethodCall(objectTemp, ctorInfo.selector, $4);
+                  (void)initTemp;
+              } else if ($4 != 0) {
+                  printf("Semantic Error at line %d: module %s has no constructor accepting %d arguments\n", yylineno, $2, $4);
+              }
+
+              $$ = makeExpr(objectTemp, 0.0, false, false, std::string("MODULE:") + $2);
+          }
+      }
     | INT_LITERAL
       {
           $$ = makeExpr(toText(static_cast<double>($1)), static_cast<double>($1), true, false, "COUNT");
@@ -1058,51 +1713,238 @@ expression
       {
           $$ = makeExpr(toText($1), $1, true, false, "REAL");
       }
-        | STRING_LITERAL
-            {
-                    $$ = makeExpr($1, 0.0, true, false, "SYMBOL");
-            }
+    | STRING_LITERAL
+      {
+          $$ = makeExpr($1, 0.0, true, false, "SYMBOL");
+      }
     | THIS
       {
           if (!currentFunctionInModule) {
               printf("Semantic Error at line %d: this used outside module function context\n", yylineno);
+              $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+          } else {
+              $$ = makeExpr("this", 0.0, false, true, std::string("MODULE:") + currentFunctionOwnerModule);
           }
-          $$ = makeExpr("\"this\"", 0.0, true, false, "SYMBOL");
+      }
+    | SUPER
+      {
+          if (!currentFunctionInModule) {
+              printf("Semantic Error at line %d: super used outside module function context\n", yylineno);
+              $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+          } else {
+              auto moduleIt = moduleTable.find(currentFunctionOwnerModule);
+              if (moduleIt == moduleTable.end() || moduleIt->second.baseName.empty()) {
+                  printf("Semantic Error at line %d: super used in module without base\n", yylineno);
+                  $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+              } else {
+                  $$ = makeExpr("this", 0.0, false, true, std::string("MODULE:") + moduleIt->second.baseName);
+              }
+          }
+      }
+    | IDENTIFIER MEMBER_DOT IDENTIFIER LPAREN argument_list_opt RPAREN
+      {
+          if (!isDeclaredName($1)) {
+              printf("Semantic Error at line %d: object %s not declared\n", yylineno, $1);
+              $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+          } else {
+              std::string objectType = declaredTypeOf($1);
+              if (!isModuleType(objectType)) {
+                  printf("Semantic Error at line %d: %s is not an object instance\n", yylineno, $1);
+                  $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+              } else {
+                  const std::string objectModule = moduleNameFromType(objectType);
+                  MethodInfo methodInfo;
+                  std::string ownerModule;
+                  if (!resolveMethodInHierarchy(objectModule, $3, $5, methodInfo, ownerModule)) {
+                      printf("Semantic Error at line %d: method %s not found in module %s\n", yylineno, $3, objectModule.c_str());
+                      $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+                  } else if (!canAccessMember(methodInfo.isPublic, ownerModule)) {
+                      printf("Semantic Error at line %d: method %s is private in module %s\n", yylineno, $3, ownerModule.c_str());
+                      $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+                  } else {
+                      if (methodInfo.arity != $5) {
+                          printf("Semantic Error at line %d: method %s expects %d arguments but got %d\n", yylineno, $3, static_cast<int>(methodInfo.parameterTypes.size()), $5);
+                      }
+                      std::string callTemp = tacGenerator.emitMethodCall($1, methodInfo.selector, $5);
+                      $$ = makeExpr(callTemp, 0.0, false, false, methodInfo.returnType);
+                  }
+              }
+          }
+      }
+    | THIS MEMBER_DOT IDENTIFIER LPAREN argument_list_opt RPAREN
+      {
+          if (!currentFunctionInModule) {
+              printf("Semantic Error at line %d: this used outside module function context\n", yylineno);
+              $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+          } else {
+              MethodInfo methodInfo;
+              std::string ownerModule;
+              if (!resolveMethodInHierarchy(currentFunctionOwnerModule, $3, $5, methodInfo, ownerModule)) {
+                  printf("Semantic Error at line %d: method %s not found in module %s\n", yylineno, $3, currentFunctionOwnerModule.c_str());
+                  $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+              } else if (!canAccessMember(methodInfo.isPublic, ownerModule)) {
+                  printf("Semantic Error at line %d: method %s is private in module %s\n", yylineno, $3, ownerModule.c_str());
+                  $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+              } else {
+                  if (methodInfo.arity != $5) {
+                      printf("Semantic Error at line %d: method %s expects %d arguments but got %d\n", yylineno, $3, static_cast<int>(methodInfo.parameterTypes.size()), $5);
+                  }
+                  std::string callTemp = tacGenerator.emitMethodCall("this", methodInfo.selector, $5);
+                  $$ = makeExpr(callTemp, 0.0, false, false, methodInfo.returnType);
+              }
+          }
+      }
+    | SUPER MEMBER_DOT IDENTIFIER LPAREN argument_list_opt RPAREN
+      {
+          if (!currentFunctionInModule) {
+              printf("Semantic Error at line %d: super used outside module function context\n", yylineno);
+              $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+          } else {
+              auto moduleIt = moduleTable.find(currentFunctionOwnerModule);
+              if (moduleIt == moduleTable.end() || moduleIt->second.baseName.empty()) {
+                  printf("Semantic Error at line %d: super used in module without base\n", yylineno);
+                  $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+              } else {
+                  MethodInfo methodInfo;
+                  std::string ownerModule;
+                  if (!resolveMethodInHierarchy(moduleIt->second.baseName, $3, $5, methodInfo, ownerModule)) {
+                      printf("Semantic Error at line %d: method %s not found in base module chain\n", yylineno, $3);
+                      $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+                  } else if (!canAccessMember(methodInfo.isPublic, ownerModule)) {
+                      printf("Semantic Error at line %d: method %s is private in module %s\n", yylineno, $3, ownerModule.c_str());
+                      $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+                  } else {
+                      if (methodInfo.arity != $5) {
+                          printf("Semantic Error at line %d: method %s expects %d arguments but got %d\n", yylineno, $3, static_cast<int>(methodInfo.parameterTypes.size()), $5);
+                      }
+                      std::string syntheticMethod = std::string("super:") + moduleIt->second.baseName + ":" + methodInfo.selector;
+                      std::string callTemp = tacGenerator.emitMethodCall("this", syntheticMethod, $5);
+                      $$ = makeExpr(callTemp, 0.0, false, false, methodInfo.returnType);
+                  }
+              }
+          }
+      }
+    | IDENTIFIER MEMBER_DOT IDENTIFIER
+      {
+          if (!isDeclaredName($1)) {
+              printf("Semantic Error at line %d: object %s not declared\n", yylineno, $1);
+              $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+          } else {
+              std::string objectType = declaredTypeOf($1);
+              if (!isModuleType(objectType)) {
+                  printf("Semantic Error at line %d: %s is not an object instance\n", yylineno, $1);
+                  $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+              } else {
+                  FieldInfo fieldInfo;
+                  std::string ownerModule;
+                  const std::string objectModule = moduleNameFromType(objectType);
+                  if (!resolveFieldInHierarchy(objectModule, $3, fieldInfo, ownerModule)) {
+                      printf("Semantic Error at line %d: field %s not found in module %s\n", yylineno, $3, objectModule.c_str());
+                      $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+                  } else if (!canAccessMember(fieldInfo.isPublic, ownerModule)) {
+                      printf("Semantic Error at line %d: field %s is private in module %s\n", yylineno, $3, ownerModule.c_str());
+                      $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+                  } else {
+                      std::string temp = tacGenerator.emitFieldLoad($1, $3);
+                      $$ = makeExpr(temp, 0.0, false, false, fieldInfo.typeName);
+                  }
+              }
+          }
+      }
+    | THIS MEMBER_DOT IDENTIFIER
+      {
+          if (!currentFunctionInModule) {
+              printf("Semantic Error at line %d: this used outside module function context\n", yylineno);
+              $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+          } else {
+              FieldInfo fieldInfo;
+              std::string ownerModule;
+              if (!resolveFieldInHierarchy(currentFunctionOwnerModule, $3, fieldInfo, ownerModule)) {
+                  printf("Semantic Error at line %d: field %s not found in module %s\n", yylineno, $3, currentFunctionOwnerModule.c_str());
+                  $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+              } else if (!canAccessMember(fieldInfo.isPublic, ownerModule)) {
+                  printf("Semantic Error at line %d: field %s is private in module %s\n", yylineno, $3, ownerModule.c_str());
+                  $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+              } else {
+                  std::string temp = tacGenerator.emitFieldLoad("this", $3);
+                  $$ = makeExpr(temp, 0.0, false, false, fieldInfo.typeName);
+              }
+          }
+      }
+    | SUPER MEMBER_DOT IDENTIFIER
+      {
+          if (!currentFunctionInModule) {
+              printf("Semantic Error at line %d: super used outside module function context\n", yylineno);
+              $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+          } else {
+              auto moduleIt = moduleTable.find(currentFunctionOwnerModule);
+              if (moduleIt == moduleTable.end() || moduleIt->second.baseName.empty()) {
+                  printf("Semantic Error at line %d: super used in module without base\n", yylineno);
+                  $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+              } else {
+                  FieldInfo fieldInfo;
+                  std::string ownerModule;
+                  if (!resolveFieldInHierarchy(moduleIt->second.baseName, $3, fieldInfo, ownerModule)) {
+                      printf("Semantic Error at line %d: field %s not found in base module chain\n", yylineno, $3);
+                      $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+                  } else if (!canAccessMember(fieldInfo.isPublic, ownerModule)) {
+                      printf("Semantic Error at line %d: field %s is private in module %s\n", yylineno, $3, ownerModule.c_str());
+                      $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+                  } else {
+                      std::string temp = tacGenerator.emitFieldLoad("this", $3);
+                      $$ = makeExpr(temp, 0.0, false, false, fieldInfo.typeName);
+                  }
+              }
+          }
       }
     | IDENTIFIER
       {
           if (!isDeclaredName($1)) {
-              printf("Semantic Error at line %d: variable %s not declared\n", yylineno, $1);
-              $$ = makeExpr($1, 0.0, false, false, "UNKNOWN");
+              if (currentFunctionInModule) {
+                  FieldInfo fieldInfo;
+                  std::string ownerModule;
+                  if (resolveFieldInHierarchy(currentFunctionOwnerModule, $1, fieldInfo, ownerModule)) {
+                      if (!canAccessMember(fieldInfo.isPublic, ownerModule)) {
+                          printf("Semantic Error at line %d: field %s is private in module %s\n", yylineno, $1, ownerModule.c_str());
+                          $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+                      } else {
+                          std::string temp = tacGenerator.emitFieldLoad("this", $1);
+                          $$ = makeExpr(temp, 0.0, false, false, fieldInfo.typeName);
+                      }
+                  } else {
+                      printf("Semantic Error at line %d: variable %s not declared\n", yylineno, $1);
+                      $$ = makeExpr($1, 0.0, false, false, "UNKNOWN");
+                  }
+              } else {
+                  printf("Semantic Error at line %d: variable %s not declared\n", yylineno, $1);
+                  $$ = makeExpr($1, 0.0, false, false, "UNKNOWN");
+              }
           } else {
-                            $$ = makeExpr($1, 0.0, false, true, declaredTypeOf($1));
+              $$ = makeExpr($1, 0.0, false, true, declaredTypeOf($1));
           }
       }
-        | IDENTIFIER LBRACKET expression RBRACKET
-            {
-                      if (!isDeclaredName($1)) {
-                            printf("Semantic Error at line %d: array %s not declared\n", yylineno, $1);
-                            $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
-                    } else {
-                            std::string temp = tacGenerator.emitArrayLoad($1, $3->place);
-                            $$ = makeExpr(temp, 0.0, false, false, baseType(declaredTypeOf($1)));
-                    }
-                    delete $3;
-            }
-        | IDENTIFIER LPAREN argument_list_opt RPAREN
-            {
-                auto arityIt = functionArity.find($1);
-                if (arityIt != functionArity.end() && arityIt->second != $3) {
-                    printf("Semantic Error at line %d: function %s expects %d arguments but got %d\n", yylineno, $1, arityIt->second, $3);
-                }
-                    std::string callTemp = tacGenerator.emitCall($1, $3);
-                    std::string returnType = "UNKNOWN";
-                    auto returnTypeIt = functionReturnTypes.find($1);
-                    if (returnTypeIt != functionReturnTypes.end()) {
-                        returnType = returnTypeIt->second;
-                    }
-                    $$ = makeExpr(callTemp, 0.0, false, false, returnType);
-            }
+    | IDENTIFIER LBRACKET expression RBRACKET
+      {
+          if (!isDeclaredName($1)) {
+              printf("Semantic Error at line %d: array %s not declared\n", yylineno, $1);
+              $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+          } else {
+              std::string temp = tacGenerator.emitArrayLoad($1, $3->place);
+              $$ = makeExpr(temp, 0.0, false, false, baseType(declaredTypeOf($1)));
+          }
+          delete $3;
+      }
+    | IDENTIFIER LPAREN argument_list_opt RPAREN
+      {
+          FunctionOverloadInfo overload;
+          if (!resolveGlobalFunctionOverload($1, $3, overload)) {
+              printf("Semantic Error at line %d: no overload of function %s accepts %d arguments\n", yylineno, $1, $3);
+              $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+          } else {
+              std::string callTemp = tacGenerator.emitCall(overload.qualifiedName, $3);
+              $$ = makeExpr(callTemp, 0.0, false, false, overload.returnType);
+          }
+      }
     | LPAREN expression RPAREN
       {
           $$ = $2;
@@ -1113,5 +1955,22 @@ expression
 %%
 
 void yyerror(const char *s) {
-    printf("SYNTAX ERROR at line %d: %s\n", yylineno, s);
+    const char* tokenText = (yytext && yytext[0] != '\0') ? yytext : "<eof>";
+    std::string hint = "Check statement terminators (.), bracket pairing, and token order.";
+
+    if (strstr(s, "expecting DOT") != nullptr) {
+        hint = "A statement is likely missing a terminating period '.' before this point.";
+    } else if (strstr(s, "expecting RBRACE") != nullptr) {
+        hint = "A block is missing a closing brace '}'.";
+    } else if (strstr(s, "expecting RPAREN") != nullptr) {
+        hint = "An expression or call is missing a closing parenthesis ')'.";
+    } else if (strstr(s, "unexpected $end") != nullptr) {
+        hint = "Input ended too early. Verify that mission/block braces and final 'success' are present.";
+    } else if (strcmp(tokenText, "success") == 0) {
+        hint = "The mission body may not be closed correctly before 'success'.";
+    } else if (strcmp(tokenText, "}") == 0) {
+        hint = "Unexpected '}'. Check for an extra closing brace or a missing statement before it.";
+    }
+
+    printf("SYNTAX ERROR at line %d: near '%s' - %s\n", yylineno, tokenText, hint.c_str());
 }

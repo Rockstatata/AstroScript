@@ -27,6 +27,7 @@ int main(int argc, char** argv)
     if (parseStatus == 0) {
         tacGenerator.optimize();
         tacGenerator.printCode("Optimized Three Address Code");
+        tacGenerator.printCTranslation("C-Like Translation");
         tacGenerator.execute();
         symbolTable.printTable();
     }

@@ -10,7 +10,8 @@ Goal of this file:
 
 Important runtime note:
 
-- In current backend, some keywords are parse/semantic features with limited runtime effect (`abort`, parts of `module/deploy/mode/alias/fleet` workflows).
+- In current backend, `module`/`deploy`/inheritance/member access/override/super workflows execute at runtime.
+- `abort` is still parse-level in this implementation (execution continues).
 - Outputs below focus on what the current compiler runtime prints (`PRINT: ...`).
 
 ---
@@ -341,43 +342,125 @@ PRINT: PING
 
 ---
 
-## Program 9: Module System Surface (`module`, `extends`, `public`, `private`, `this`, `deploy`)
+## Program 9: OOP End-to-End (`module`, `extends`, `this`, `super`, `override`, `deploy`, `new`)
 
 Keywords covered:
-`module`, `extends`, `public`, `private`, `this`, `deploy`
+`module`, `extends`, `public`, `this`, `super`, `override`, `deploy`, `new`
 
 ```astroscript
-mission ModuleSurface launch {
-    module Rocket {
-        public telemetry count fuel := 100.
-        private limit count serial := 9001.
+mission OOPCheck launch {
+    module Engine {
+        public telemetry count hp := 10.
 
-        command identity() : symbol {
-            back this.
+        command Engine(count start) : voidspace {
+            this.hp := start.
+        }
+
+        command inc(count x) : count {
+            this.hp := this.hp add x.
+            back this.hp.
         }
     }
 
-    module Cargo extends Rocket {
-        public telemetry count payload := 5.
+    module Turbo extends Engine {
+        public telemetry count bonus := 5.
+
+        command Turbo(count start) : voidspace {
+            this.hp := start.
+        }
+
+        override command inc(count x) : count {
+            back super.inc(x add this.bonus).
+        }
     }
 
-    deploy Rocket r1.
-    deploy Cargo.
-
-    transmit identity().
+    deploy Turbo t(20).
+    telemetry count result := t.inc(2).
+    transmit result.
+    transmit t.hp.
 } success
 ```
 
 Expected output:
 
 ```text
-PRINT: this
+PRINT: 27
+PRINT: 27
 ```
 
 Notes:
 
-- Current implementation treats module/function metadata with simplified runtime object behavior.
-- `deploy` statements are recognized and represented semantically.
+- Constructors are regular module commands with the same name as the module.
+- `override` validates that a compatible method exists in the base module chain.
+- `super.method(...)` dispatches directly to base-module implementation.
+
+---
+
+## Program 9.1: Overloading and Scoped Variables
+
+Keywords covered:
+`command` overloading, module method overloading, lexical variable shadowing
+
+```astroscript
+mission OverloadAndScope launch {
+    command allocate(count slots) : count {
+        back slots add 1.
+    }
+
+    command allocate(count slots, count reserve) : count {
+        back slots add reserve.
+    }
+
+    module Queue {
+        public telemetry count backlog := 0.
+
+        command Queue(count seed) : voidspace {
+            this.backlog := seed.
+        }
+
+        command enqueue(count tasks) : count {
+            this.backlog := this.backlog add tasks.
+            back this.backlog.
+        }
+
+        command enqueue(count tasks, count priority) : count {
+            this.backlog := this.backlog add tasks add priority.
+            back this.backlog.
+        }
+    }
+
+    deploy Queue q(5).
+
+    transmit allocate(3).
+    transmit allocate(3, 2).
+    transmit q.enqueue(2).
+    transmit q.enqueue(2, 1).
+
+    telemetry count backlog := 42.
+    verify (1 == 1) {
+        telemetry count backlog := 99.
+        transmit backlog.
+    }
+
+    transmit backlog.
+} success
+```
+
+Expected output:
+
+```text
+PRINT: 4
+PRINT: 5
+PRINT: 7
+PRINT: 10
+PRINT: 99
+PRINT: 42
+```
+
+Notes:
+
+- Overloads are selected strictly by parameter count.
+- Inner block declarations shadow outer variables and are released at block exit.
 
 ---
 

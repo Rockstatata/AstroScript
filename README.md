@@ -122,10 +122,15 @@ mission HelloWorld launch {
 - **Loops**: `orbit` (while), `orbit times` (for)
 - **Functions**: `command` definitions with `back` returns
 - **Compiler phases**: Lexing → Parsing → Semantic Analysis → TAC Generation → Optimization → Execution
+- **Learning bridge**: Optimized TAC plus readable C-like translation output for playground comparison
 
 ## Documentation
 
 See the [docs/](docs/) directory or run the website and navigate to `/docs`.
+
+Rubric tracking is maintained in [docs/rubric-compliance.md](docs/rubric-compliance.md).
+
+Line-by-line compiler tracing for conditionals, loops, functions, and classes/modules is available in [docs/compiler-feature-execution-map.md](docs/compiler-feature-execution-map.md).
 
 ## License
 
