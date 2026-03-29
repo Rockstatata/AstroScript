@@ -10,15 +10,15 @@ export default function HeroSection() {
         </div>
 
         <h1 className="max-w-140 text-[clamp(2.4rem,7vw,5.3rem)] font-semibold leading-[0.93] tracking-[-0.03em] text-white" style={{ fontFamily: "var(--font-space-grotesk)" }}>
-          <span className="block">Explore Programming</span>
+          <span className="block">Plan Missions with</span>
           <span className="mt-1 block bg-linear-to-r from-[#8cb0ff] via-[#6e88ff] to-[#53d5ff] bg-clip-text text-transparent">
-            Through the Cosmos
+            Production-Grade AstroScript
           </span>
         </h1>
 
         <p className="mt-7 max-w-[60ch] text-[clamp(1.02rem,2.5vw,1.24rem)] leading-relaxed text-[#d0d8ff]/86">
-          A professional developer tool built with Flex + Bison for the next generation of space-faring code.
-          High performance, stellar syntax, and astronomical efficiency.
+          Build mission control and operations management workflows with typed modules, overload-aware
+          dispatch, and compiler-backed reliability.
         </p>
 
         <div className="mt-9 flex flex-wrap gap-3">

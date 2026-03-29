@@ -9,7 +9,7 @@ import { PlaygroundSidebar } from "@/components/playground/PlaygroundSidebar";
 import { PlaygroundToolbar } from "@/components/playground/PlaygroundToolbar";
 import { StatusBar } from "@/components/playground/StatusBar";
 
-type PlaygroundTab = "output" | "tokens" | "ir" | "errors";
+type PlaygroundTab = "output" | "tokens" | "ir" | "c" | "errors";
 
 type PlaygroundDiagnostic = {
   kind: "lexical" | "syntax" | "semantic" | "runtime" | "unknown";
@@ -24,6 +24,7 @@ type CompileResponse = {
   output?: string;
   tokens?: string;
   ir?: string;
+  cCode?: string;
   error?: string;
   stdout?: string;
   stderr?: string;
@@ -298,37 +299,112 @@ success`,
 success`,
   },
   modulesDeployThis: {
-  label: "Module 10: module/deploy/extends/public/private/this",
-  code: `mission ModulesDeployThis launch
+  label: "Module 10: OOP (extends/override/super/new)",
+  code: `mission MissionOOP launch
 {
   module BaseModule
   {
-    public telemetry count id.
+    public telemetry count id := 0.
+
+    command BaseModule(count initial) : voidspace
+    {
+      this.id := initial.
+    }
 
     command base_id() : count
     {
-      back id.
+      back this.id.
+    }
+
+    command add_task(count incoming) : count
+    {
+      this.id := this.id add incoming.
+      back this.id.
     }
   }
 
   module ChildModule extends BaseModule
   {
-    private telemetry symbol name.
+    public telemetry count emergencyBoost := 2.
 
-    command who() : count
+    command ChildModule(count initial) : voidspace
     {
-      transmit this.
-      back 42.
+      this.id := initial.
+    }
+
+    override command add_task(count incoming) : count
+    {
+      back super.add_task(incoming add this.emergencyBoost).
     }
   }
 
-  deploy ChildModule ship.
-  deploy genericObj.
+  deploy ChildModule ship(10).
+  transmit ship.add_task(3).
+  transmit ship.id.
+
+  telemetry ChildModule backup := new ChildModule(20).
+  transmit backup.add_task(1).
+}
+success`,
+  },
+  overloadingAndScope: {
+  label: "Module 11: Command/Method Overloading + Scoped Variables",
+  code: `mission OverloadingScope launch
+{
+  command route(count normal) : count
+  {
+    back normal add 1.
+  }
+
+  command route(count normal, count emergency) : count
+  {
+    back normal add emergency.
+  }
+
+  module MissionQueue
+  {
+    public telemetry count backlog := 0.
+
+    command MissionQueue(count seed) : voidspace
+    {
+      this.backlog := seed.
+    }
+
+    command enqueue(count tasks) : count
+    {
+      this.backlog := this.backlog add tasks.
+      back this.backlog.
+    }
+
+    command enqueue(count tasks, count priority) : count
+    {
+      this.backlog := this.backlog add tasks add priority.
+      back this.backlog.
+    }
+  }
+
+  deploy MissionQueue q(5).
+
+  telemetry count r1 := route(3).
+  telemetry count r2 := route(3, 4).
+  transmit r1.
+  transmit r2.
+  transmit q.enqueue(2).
+  transmit q.enqueue(2, 1).
+
+  telemetry count backlog := 77.
+  verify (1 == 1)
+  {
+    telemetry count backlog := 500.
+    transmit backlog.
+  }
+
+  transmit backlog.
 }
 success`,
   },
   modeAndAbort: {
-  label: "Module 11: mode + abort",
+  label: "Module 12: mode + abort",
   code: `mission ModeAbort launch
 {
   mode MissionState
@@ -411,7 +487,6 @@ success`,
   }
 
   deploy ChildModule ship.
-  deploy genericObj.
 
   r := a add b.
   transmit r.
@@ -551,6 +626,7 @@ export default function PlaygroundPage() {
   const [output, setOutput] = useState("");
   const [tokens, setTokens] = useState("");
   const [ir, setIr] = useState("");
+  const [cCode, setCCode] = useState("");
   const [error, setError] = useState("");
   const [stdout, setStdout] = useState("");
   const [stderr, setStderr] = useState("");
@@ -618,6 +694,7 @@ export default function PlaygroundPage() {
       setOutput(data.output ?? "");
       setTokens(data.tokens ?? "");
       setIr(data.ir ?? "");
+      setCCode(data.cCode ?? "");
       setStdout(data.stdout ?? "");
       setStderr(data.stderr ?? "");
       setUserMessage(data.userMessage ?? "");
@@ -668,6 +745,7 @@ export default function PlaygroundPage() {
     setOutput("");
     setTokens("");
     setIr("");
+    setCCode("");
     setError("");
     setStdout("");
     setStderr("");
@@ -797,6 +875,7 @@ export default function PlaygroundPage() {
               output={output}
               tokens={tokens}
               ir={ir}
+              cCode={cCode}
               error={error}
               stdout={stdout}
               stderr={stderr}

@@ -1,6 +1,6 @@
 import { memo } from "react";
 
-type PlaygroundTab = "output" | "tokens" | "ir" | "errors";
+type PlaygroundTab = "output" | "tokens" | "ir" | "c" | "errors";
 
 type OutputDiagnostic = {
   kind: "lexical" | "syntax" | "semantic" | "runtime" | "unknown";
@@ -17,6 +17,7 @@ type OutputPanelProps = {
   output: string;
   tokens: string;
   ir: string;
+  cCode: string;
   error: string;
   stdout: string;
   stderr: string;
@@ -29,6 +30,7 @@ const tabs: { key: PlaygroundTab; label: string }[] = [
   { key: "output", label: "Output" },
   { key: "tokens", label: "Tokens" },
   { key: "ir", label: "Intermediate Code" },
+  { key: "c", label: "C Translation" },
   { key: "errors", label: "Errors" },
 ];
 
@@ -61,6 +63,10 @@ function getTabText(props: OutputPanelProps): string {
     return props.ir || "No intermediate code was generated.";
   }
 
+  if (props.activeTab === "c") {
+    return props.cCode || "No C-like translation was generated.";
+  }
+
   return props.error || props.stderr || "No errors.";
 }
 
@@ -69,6 +75,7 @@ function OutputPanelComponent(props: OutputPanelProps) {
   const outputLines = countNonEmptyLines(props.output);
   const tokenLines = countNonEmptyLines(props.tokens);
   const instructionCount = countTacInstructions(props.ir);
+  const cLines = countNonEmptyLines(props.cCode);
   const hasErrors = Boolean(props.error || props.stderr);
 
   return (
@@ -92,10 +99,11 @@ function OutputPanelComponent(props: OutputPanelProps) {
       </div>
 
       <div className="flex-1 overflow-auto px-3 py-3 font-mono text-sm leading-7 text-[#d0d5ef] sm:px-4">
-        <div className="mb-4 grid gap-2 text-[11px] uppercase tracking-[0.08em] text-[#8e97bf] sm:grid-cols-4">
+        <div className="mb-4 grid gap-2 text-[11px] uppercase tracking-[0.08em] text-[#8e97bf] sm:grid-cols-5">
           <div className="rounded-md border border-white/10 bg-white/4 px-2 py-1.5">Output Lines: {outputLines}</div>
           <div className="rounded-md border border-white/10 bg-white/4 px-2 py-1.5">Token Lines: {tokenLines}</div>
           <div className="rounded-md border border-white/10 bg-white/4 px-2 py-1.5">IR Instructions: {instructionCount}</div>
+          <div className="rounded-md border border-white/10 bg-white/4 px-2 py-1.5">C Lines: {cLines}</div>
           <div className={`rounded-md border px-2 py-1.5 ${hasErrors ? "border-rose-300/30 bg-rose-400/10 text-rose-200" : "border-emerald-300/30 bg-emerald-400/10 text-emerald-200"}`}>
             Diagnostics: {hasErrors ? "Present" : "None"}
           </div>
@@ -133,7 +141,7 @@ function OutputPanelComponent(props: OutputPanelProps) {
             </span>
             {props.running
               ? "Compiler process is running. Results will appear here as soon as execution completes."
-              : "Use the tabs to inspect runtime output, token stream, intermediate code, and parser errors."}
+              : "Use the tabs to inspect runtime output, token stream, intermediate code, C translation, and parser errors."}
           </p>
         </div>
       </div>

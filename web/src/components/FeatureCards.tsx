@@ -1,8 +1,8 @@
 const cards = [
   {
-    title: "Designed for Learning Compilers",
+    title: "Mission Management Ready",
     description:
-      "A clean architecture designed to teach the fundamentals of compiler design through modular construction.",
+      "Build planning dashboards, staffing pipelines, and launch workflows with typed modules, inheritance, and scoped state.",
     icon: (
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
         <path d="M4 7.5 12 4l8 3.5L12 11 4 7.5Z" />
@@ -11,9 +11,9 @@ const cards = [
     ),
   },
   {
-    title: "Flex + Bison Powered",
+    title: "Overloading + OOP Dispatch",
     description:
-      "Leveraging industry-standard tools for robust lexical and syntactic analysis that stands the test of time.",
+      "AstroScript supports overloaded commands and module methods by arity, plus override/super dispatch for mission hierarchy design.",
     icon: (
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
         <rect x="6" y="6" width="12" height="12" rx="2" />
@@ -22,9 +22,9 @@ const cards = [
     ),
   },
   {
-    title: "Space Inspired Syntax",
+    title: "Flex + Bison Core",
     description:
-      "A unique DSL that makes coding feel like navigating the stars with specialized primitives for telemetry.",
+      "Industry-standard lexer/parser tooling with semantic checks, optimized TAC, and readable C-like translation output.",
     icon: (
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
         <path d="m12 3 1.7 3.6L18 8.2l-3 2.9.8 4.2L12 13.5l-3.8 1.8.8-4.2-3-2.9 4.3-1.6L12 3Z" />

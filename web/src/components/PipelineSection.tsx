@@ -28,7 +28,7 @@ const steps = [
   },
   {
     title: "Semantic Analysis",
-    subtitle: "Type Checking",
+    subtitle: "Type + Overload Checking",
     icon: (
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
         <path d="M12 3 4.2 7.5v9L12 21l7.8-4.5v-9L12 3Z" />

@@ -46,8 +46,9 @@ export default function DocsIntroduction() {
         <h1 className="text-5xl font-extrabold tracking-tight text-white sm:text-6xl">Introduction</h1>
         <p className="mt-6 max-w-3xl text-[1.2rem] leading-9 text-white/72">
           Welcome to the official AstroScript documentation. AstroScript is a mission-oriented
-          programming language implemented using Flex and Bison, designed to illustrate compiler
-          construction concepts from lexical analysis to optimized intermediate code.
+          programming language implemented using Flex and Bison, designed to power practical
+          mission planning and management workflows while illustrating compiler construction
+          concepts from lexical analysis to optimized intermediate code.
         </p>
       </header>
 
@@ -60,7 +61,11 @@ export default function DocsIntroduction() {
           <span className="mx-1 font-mono text-primary">verify</span>, and
           <span className="ml-1 font-mono text-primary">orbit</span>.
           These map directly to common constructs like main(), variable declarations, conditionals,
-          and loops.
+          and loops, while newer keywords like
+          <span className="mx-1 font-mono text-primary">override</span>,
+          <span className="mx-1 font-mono text-primary">super</span>, and
+          <span className="ml-1 font-mono text-primary">new</span>
+          support advanced mission-architecture patterns.
         </p>
       </DocsCallout>
 
@@ -70,8 +75,9 @@ export default function DocsIntroduction() {
         <p className="mt-5 text-lg leading-8 text-white/72">
           AstroScript is a space mission-based programming language where a program begins with a
           mission declaration and launch phase, and ends with either success or abort. It is built
-          for students and compiler enthusiasts who want to understand how a modern compiler works,
-          end-to-end, through a memorable domain language.
+          for students, compiler enthusiasts, and builders who want to implement real mission
+          management systems using typed functions, modules, inheritance, overloading, and scoped
+          state transitions.
         </p>
       </section>
 

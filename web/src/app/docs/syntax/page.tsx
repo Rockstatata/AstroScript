@@ -19,6 +19,10 @@ export default function DocsSyntax() {
           use period-terminated statements, and express control flow using readable space-themed
           keywords.
         </p>
+        <p className="mt-3 max-w-3xl text-[1.02rem] leading-7 text-white/65">
+          In the playground, each compile now exposes optimized IR and a readable C Translation tab
+          so learners can relate AstroScript flow to familiar C-style statements.
+        </p>
       </header>
 
       <section className="mt-10 space-y-10">
@@ -105,6 +109,97 @@ receive variable.`}
           <p className="mt-3 text-white/70">
             AstroScript also accepts <span className="font-mono text-primary">{":->"}</span> as a return-type separator.
           </p>
+        </div>
+
+        <div id="overloading-and-scope" className="scroll-mt-24">
+          <h2 className="text-3xl font-semibold tracking-tight text-white">Overloading and Scoped Variables</h2>
+          <p className="mt-3 text-white/70">
+            AstroScript supports function and method overloading by parameter count, plus lexical
+            variable shadowing for mission blocks.
+          </p>
+          <div className="mt-4">
+            <DocsCodeBlock
+              filename="overloading.astro"
+              language="astroscript"
+              code={`command allocate(count slots) : count
+{
+    back slots add 1.
+}
+
+command allocate(count slots, count reserve) : count
+{
+    back slots add reserve.
+}
+
+module MissionLog
+{
+    command push(symbol entry) : count
+    {
+        back 1.
+    }
+
+    command push(symbol entry, count priority) : count
+    {
+        back priority.
+    }
+}
+
+telemetry count cap := allocate(3).
+telemetry count cap2 := allocate(3, 2).
+
+verify (1 == 1)
+{
+    telemetry count cap := 99.
+    transmit cap.
+}
+
+transmit cap.`}
+            />
+          </div>
+        </div>
+
+        <div id="mission-planning-oop" className="scroll-mt-24">
+          <h2 className="text-3xl font-semibold tracking-tight text-white">Mission Planning OOP Pattern</h2>
+          <div className="mt-4">
+            <DocsCodeBlock
+              filename="mission-planner.astro"
+              language="astroscript"
+              code={`module MissionPlan
+{
+    public telemetry count tasks.
+
+    command MissionPlan(count initialTasks) : voidspace
+    {
+        this.tasks := initialTasks.
+    }
+
+    command schedule(count incoming) : count
+    {
+        this.tasks := this.tasks add incoming.
+        back this.tasks.
+    }
+}
+
+module PriorityMissionPlan extends MissionPlan
+{
+    public telemetry count emergencyBoost := 2.
+
+    command PriorityMissionPlan(count initialTasks) : voidspace
+    {
+        this.tasks := initialTasks.
+    }
+
+    override command schedule(count incoming) : count
+    {
+        back super.schedule(incoming add this.emergencyBoost).
+    }
+}
+
+deploy PriorityMissionPlan planner(8).
+transmit planner.schedule(3).
+transmit planner.tasks.`}
+            />
+          </div>
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#12162f]/70">

@@ -249,15 +249,25 @@ export async function POST(request: NextRequest) {
     const irEnd = irStart === -1
       ? -1
       : lines.findIndex((l, i) => i > irStart && l.includes("-----------------------------"));
+    const cStart = lines.findIndex((l) => l.includes("--- C-Like Translation ---"));
+    const cEnd = cStart === -1
+      ? -1
+      : lines.findIndex((l, i) => i > cStart && l.includes("-----------------------------"));
 
     let output = "";
     let ir = "";
+    let cCode = "";
     let tokens = "";
     let error = "";
 
     if (irStart !== -1) {
       const irSliceEnd = irEnd !== -1 ? irEnd : lines.length;
       ir = lines.slice(irStart, irSliceEnd).join("\n").trim();
+    }
+
+    if (cStart !== -1) {
+      const cSliceEnd = cEnd !== -1 ? cEnd : lines.length;
+      cCode = lines.slice(cStart, cSliceEnd).join("\n").trim();
     }
 
     const execLines = lines.filter((l) => l.startsWith("PRINT: "));
@@ -280,6 +290,7 @@ export async function POST(request: NextRequest) {
         output,
         tokens,
         ir,
+        cCode,
         stdout: stdoutText,
         stderr: stderrText,
         error,
@@ -288,7 +299,7 @@ export async function POST(request: NextRequest) {
       }, { status: 422 });
     }
 
-    return NextResponse.json({ output, tokens, ir, stdout: stdoutText, stderr: stderrText, diagnostics: [] });
+    return NextResponse.json({ output, tokens, ir, cCode, stdout: stdoutText, stderr: stderrText, diagnostics: [] });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Compilation failed";
     return NextResponse.json({ error: message }, { status: 500 });

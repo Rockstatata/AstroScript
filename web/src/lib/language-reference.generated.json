@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-28T08:37:38.790Z",
+  "generatedAt": "2026-03-29T21:41:27.883Z",
   "keywordSections": [
     {
       "title": "Program Structure",
@@ -43,8 +43,8 @@
         },
         {
           "keyword": "fleet",
-          "purpose": "Reserved declaration token",
-          "equivalent": "reserved",
+          "purpose": "Dynamic array declaration",
+          "equivalent": "dynamic array",
           "status": "active"
         },
         {
@@ -115,8 +115,8 @@
       "rows": [
         {
           "keyword": "coast",
-          "purpose": "Reserved control token",
-          "equivalent": "reserved",
+          "purpose": "Continue loop iteration",
+          "equivalent": "continue",
           "status": "active"
         },
         {
@@ -151,8 +151,8 @@
         },
         {
           "keyword": "stage_sep",
-          "purpose": "Reserved control token",
-          "equivalent": "reserved",
+          "purpose": "Break from loop/scenario",
+          "equivalent": "break",
           "status": "active"
         },
         {
@@ -187,8 +187,8 @@
       "rows": [
         {
           "keyword": "alarm",
-          "purpose": "Reserved IO token",
-          "equivalent": "reserved",
+          "purpose": "Output alias",
+          "equivalent": "print",
           "status": "active"
         },
         {
@@ -199,8 +199,8 @@
         },
         {
           "keyword": "broadcast",
-          "purpose": "Reserved IO token",
-          "equivalent": "reserved",
+          "purpose": "Output alias",
+          "equivalent": "print",
           "status": "active"
         },
         {
@@ -229,8 +229,8 @@
       "rows": [
         {
           "keyword": "deploy",
-          "purpose": "Reserved module token",
-          "equivalent": "reserved",
+          "purpose": "Instantiate module object",
+          "equivalent": "stack object creation",
           "status": "active"
         },
         {
@@ -246,6 +246,18 @@
           "status": "active"
         },
         {
+          "keyword": "new",
+          "purpose": "Heap-style object expression",
+          "equivalent": "new",
+          "status": "active"
+        },
+        {
+          "keyword": "override",
+          "purpose": "Override declaration token",
+          "equivalent": "override",
+          "status": "active"
+        },
+        {
           "keyword": "private",
           "purpose": "Access modifier",
           "equivalent": "private",
@@ -255,6 +267,12 @@
           "keyword": "public",
           "purpose": "Access modifier",
           "equivalent": "public",
+          "status": "active"
+        },
+        {
+          "keyword": "super",
+          "purpose": "Base method dispatch token",
+          "equivalent": "super",
           "status": "active"
         },
         {
