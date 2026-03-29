@@ -3,7 +3,7 @@ import { access } from "fs/promises";
 import { join } from "path";
 
 type CompilerTarget = "auto" | "windows" | "linux";
-const ASTROSCRIPT_COMPILER_TARGET = "linux";
+const ASTROSCRIPT_COMPILER_TARGET = "linux"; // process.env.ASTROSCRIPT_COMPILER_TARGET;
 
 function normalizeCompilerTarget(rawTarget?: string): CompilerTarget {
   const normalized = rawTarget?.trim().toLowerCase();

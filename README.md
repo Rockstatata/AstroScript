@@ -28,6 +28,15 @@ astroscript/
 
 Requires: `flex`, `bison`, `g++` (with C++17 support)
 
+Structured build with Make (recommended):
+
+```bash
+make linux
+make windows
+# or build both
+make all
+```
+
 macOS/Linux:
 
 ```bash
@@ -39,6 +48,11 @@ Windows (PowerShell):
 ```powershell
 .\scripts\build_compiler.ps1
 ```
+
+Equivalent mapping between script and Make targets:
+
+- `./scripts/build_compiler.sh` ↔ `make linux`
+- `.\scripts\build_compiler.ps1` ↔ `make windows`
 
 Build script outputs:
 
