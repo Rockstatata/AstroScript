@@ -600,8 +600,29 @@ declaration
           if (!declareScopedName($3, arrayType, false, yylineno)) {
               reportRedeclaration($3);
           } else {
-              tacGenerator.emitArrayDecl($2, $3, "0");
+              // Unsized fleet defaults to a small usable capacity for indexed operations.
+              tacGenerator.emitArrayDecl($2, $3, "8");
           }
+      }
+    | FLEET type IDENTIFIER LBRACKET INT_LITERAL RBRACKET DOT
+      {
+          const std::string arrayType = std::string($2) + "[]";
+          if (!declareScopedName($3, arrayType, false, yylineno)) {
+              reportRedeclaration($3);
+          } else {
+              tacGenerator.emitArrayDecl($2, $3, toText(static_cast<double>($5)));
+          }
+      }
+    | FLEET type IDENTIFIER LBRACKET INT_LITERAL RBRACKET ASSIGN expression DOT
+      {
+          const std::string arrayType = std::string($2) + "[]";
+          if (!declareScopedName($3, arrayType, false, yylineno)) {
+              reportRedeclaration($3);
+          } else {
+              tacGenerator.emitArrayDecl($2, $3, toText(static_cast<double>($5)));
+              tacGenerator.emitArrayStore($3, "0", $8->place);
+          }
+          delete $8;
       }
     | MODE IDENTIFIER LBRACE mode_body RBRACE
     | TELEMETRY type IDENTIFIER LBRACKET INT_LITERAL RBRACKET DOT

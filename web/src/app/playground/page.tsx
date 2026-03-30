@@ -71,8 +71,10 @@ success`,
   telemetry IntAlias custom := 11.
   limit count MAX_LIMIT := 100.
 
-  fleet count dynFleet.
+  fleet count dynFleet[4].
   telemetry count arr[3].
+  dynFleet[0] := c add 1.
+  dynFleet[1] := dynFleet[0] add 2.
   arr[0] := c.
   arr[1] := custom.
   arr[2] := MAX_LIMIT.
@@ -83,6 +85,7 @@ success`,
   transmit ok.
   transmit msg.
   transmit custom.
+  transmit dynFleet[1].
   transmit arr[1].
 }
 success`,
@@ -446,7 +449,7 @@ success`,
   telemetry symbol msg := "Astro".
   telemetry IntAlias aliasVar := 10.
   telemetry count arr[5].
-  fleet count dynFleet.
+  fleet count dynFleet[3].
   limit count LIMITER := 99.
 
   command add_kw(count x, count y) : count
@@ -490,6 +493,9 @@ success`,
 
   r := a add b.
   transmit r.
+  dynFleet[0] := r.
+  dynFleet[1] := dynFleet[0] add 1.
+  transmit dynFleet[1].
   r := a + b.
   transmit r.
   r := a minus b.

@@ -69,7 +69,7 @@
 |    67 | `super`                        | `super`                              | Reference to base module behavior     |   |            |
 |    68 | `override`                     | `override`                           | Explicit method override marker       |   |            |
 |    69 | `new`                          | `new`                                | Heap-style object creation expression |   |            |
-|    70 | `fleet`                        | array                                | Collection of objects or values       |   |            |
+|    70 | `fleet`                        | typed array declaration              | Declares indexed typed array storage  |   |            |
 |    71 | `mode`                         | `enum`                               | Enumerated type                       |   |            |
 |    72 | `alias`                        | `typedef`                            | Type alias                            |   |            |
 |    73 | `{`                            | `{`                                  | Block start                           |   |            |

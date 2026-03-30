@@ -114,7 +114,7 @@ Implemented forms include:
 - limit declaration (constant-like but currently mutable at runtime)
 - arrays (`telemetry type name[size].`)
 - mode definitions with `trajectory`/`fallback` entries
-- alias/fleet declarations are parsed but currently non-executing placeholders
+- alias declarations are metadata mappings; fleet declarations emit executable typed array declarations (`fleet type name[size].` or unsized `fleet type name.` with default capacity)
 
 ### Assignment and array indexing
 

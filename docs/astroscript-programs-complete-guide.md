@@ -279,13 +279,17 @@ Keywords covered:
 
 ```astroscript
 mission ArraysAndFleet launch {
-    fleet count standbyFleet.
+    fleet count standbyFleet[4].
+    standbyFleet[0] := 42.
+    standbyFleet[1] := standbyFleet[0] add 8.
 
     telemetry count nums[5].
     nums[0] := 7.
     nums[1] := nums[0] add 5.
     nums[2] := nums[1] mul 2.
 
+    transmit standbyFleet[0].
+    transmit standbyFleet[1].
     transmit nums[0].
     transmit nums[1].
     transmit nums[2].
@@ -295,6 +299,8 @@ mission ArraysAndFleet launch {
 Expected output:
 
 ```text
+PRINT: 42
+PRINT: 50
 PRINT: 7
 PRINT: 12
 PRINT: 24
@@ -302,7 +308,8 @@ PRINT: 24
 
 Note:
 
-- `fleet` is parsed and represented as array-like type metadata.
+- `fleet` creates a typed indexed array (same runtime model as `telemetry ...[size]`).
+- Unsized form (`fleet count standbyFleet.`) is valid and uses default capacity 8.
 
 ---
 

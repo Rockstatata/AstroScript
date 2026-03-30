@@ -93,7 +93,7 @@ const keywordMeta = {
   telemetry: { purpose: "Variable declaration", equivalent: "declaration" },
   limit: { purpose: "Constant-like declaration", equivalent: "const" },
   alias: { purpose: "Reserved declaration token", equivalent: "reserved" },
-  fleet: { purpose: "Dynamic array declaration", equivalent: "dynamic array" },
+  fleet: { purpose: "Typed array declaration", equivalent: "typed array" },
   mode: { purpose: "Mode declaration", equivalent: "enum-like" },
 
   count: { purpose: "Integer type", equivalent: "int" },

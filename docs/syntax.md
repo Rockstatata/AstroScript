@@ -128,7 +128,16 @@ $* This is a
 telemetry count arr[5].
 arr[0] := 10.
 transmit arr[0].
+
+fleet count standby[4].
+standby[0] := 3.
+transmit standby[0].
 ```
+
+Notes:
+- `telemetry type name[size].` and `fleet type name[size].` both declare typed indexed arrays.
+- `fleet type name.` is also valid and creates a default-capacity array (8 slots).
+- You can initialize index `0` directly in declarations: `fleet count q[3] := 9.`
 
 ## Object-Oriented Programming
 
@@ -182,6 +191,15 @@ Notes:
 - Use `this.member` inside module methods.
 - Use `super.method(...)` for base-module method dispatch.
 - Member access uses dot syntax and the dot must be directly followed by the member name (for example `t.hp`, not `t. hp`).
+
+### How class-like modules work (without native C classes)
+
+AstroScript does not rely on native C classes. Instead, the compiler lowers module code into TAC operations:
+- object creation: `obj_new`
+- field writes/reads: `field_set` and `field_get`
+- method calls: `mcall`
+
+At runtime, the interpreter keeps object records and method labels, then dispatches calls through that table. So the language gives class-like behavior (`deploy`, `this`, `super`, `override`) even though the runtime model is table-driven instead of native class memory layout.
 
 ## Overloading and Scoped Variables
 

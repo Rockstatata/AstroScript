@@ -140,7 +140,23 @@ mission ComprehensiveTest launch {
     
     
     $$ ==========================================
-    $$ 7. LOGICAL COMPARISONS IN CONDITIONS
+    $$ 7. ARRAYS AND FLEET INDEXED STORAGE
+    $$ ==========================================
+
+    telemetry count samples[3].
+    fleet count standbyFleet[4].
+
+    samples[0] := 11.
+    samples[1] := samples[0] add 4.
+    standbyFleet[0] := samples[1].
+    standbyFleet[1] := standbyFleet[0] add 9.
+
+    transmit samples[1].
+    transmit standbyFleet[1].
+
+
+    $$ ==========================================
+    $$ 8. LOGICAL COMPARISONS IN CONDITIONS
     $$ ==========================================
     
     telemetry count min_val.
@@ -184,7 +200,7 @@ mission ComprehensiveTest launch {
     }
     
     $$ ==========================================
-    $$ 8. OOP + OVERLOADING + SCOPED SHADOWING
+    $$ 9. OOP + OVERLOADING + SCOPED SHADOWING
     $$ ==========================================
 
     command route(count normal) : count {
@@ -240,7 +256,7 @@ mission ComprehensiveTest launch {
     transmit backlog_shadow.
 
     $$ ==========================================
-    $$ 9. FINAL SUMMARY
+    $$ 10. FINAL SUMMARY
     $$ ==========================================
     
     status := 9999.
