@@ -31,6 +31,12 @@ BISON ?= bison
 CXX ?= g++
 OBJDUMP ?= objdump
 
+# Some Windows GNU Make distributions set a cross-compiler as built-in CXX.
+# Prefer local MinGW g++ unless the user explicitly overrides CXX.
+ifeq ($(origin CXX), default)
+	CXX := g++
+endif
+
 # Paths
 COMPILER_DIR := backend/compiler
 BUILD_DIR := $(COMPILER_DIR)/build
@@ -81,11 +87,11 @@ $(SERVER_COMPILER_DIR):
 
 $(LEXER_OUT): $(LEXER_SRC) | $(BUILD_DIR)
 	@echo "==> Running Flex (lexer)..."
-	$(FLEX) -o $(LEXER_OUT) $(LEXER_SRC)
+	$(FLEX) -o$(LEXER_OUT) $(LEXER_SRC)
 
 $(PARSER_OUT) $(PARSER_HDR): $(PARSER_SRC) | $(BUILD_DIR)
 	@echo "==> Running Bison (parser)..."
-	$(BISON) -d -o $(PARSER_OUT) $(PARSER_SRC)
+	$(BISON) -d -o$(PARSER_OUT) $(PARSER_SRC)
 
 $(LINUX_BINARY): $(LEXER_OUT) $(PARSER_OUT) $(PARSER_HDR) $(CPP_SRCS) | $(SERVER_COMPILER_DIR)
 	@echo "==> Compiling AstroScript compiler (Linux target)..."

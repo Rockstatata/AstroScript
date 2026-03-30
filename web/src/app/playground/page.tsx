@@ -8,6 +8,7 @@ import { OutputPanel } from "@/components/playground/OutputPanel";
 import { PlaygroundSidebar } from "@/components/playground/PlaygroundSidebar";
 import { PlaygroundToolbar } from "@/components/playground/PlaygroundToolbar";
 import { StatusBar } from "@/components/playground/StatusBar";
+import { playgroundExamples } from "@/lib/playground-examples.generated";
 
 type PlaygroundTab = "output" | "tokens" | "ir" | "c" | "errors";
 
@@ -38,7 +39,31 @@ type HealthResponse = {
   compilerPath?: string;
 };
 
-const examples: Record<string, { label: string; code: string }> = {
+function countReceiveStatements(code: string): number {
+  const matches = code.match(/\breceive\b/gi);
+  return matches ? matches.length : 0;
+}
+
+function promptRuntimeInput(existingInput: string, receiveCount: number): string | null {
+  if (receiveCount <= 0) {
+    return existingInput;
+  }
+
+  const defaults = existingInput.split(/\r?\n/);
+  const values: string[] = [];
+  for (let index = 0; index < receiveCount; index += 1) {
+    const defaultValue = defaults[index] ?? "";
+    const userValue = window.prompt(`Runtime input ${index + 1}/${receiveCount}:`, defaultValue);
+    if (userValue === null) {
+      return null;
+    }
+    values.push(userValue);
+  }
+
+  return values.join("\n");
+}
+
+const legacyExamples: Record<string, { label: string; code: string }> = {
   basics: {
     label: "Mission Basics",
     code: `mission Apollo launch
@@ -622,6 +647,19 @@ success`,
   },
 };
 
+const generatedExamples: Record<string, { label: string; code: string }> = Object.fromEntries(
+  Object.entries(playgroundExamples).map(([key, value]) => [
+    key,
+    {
+      label: value.label,
+      code: value.code,
+    },
+  ]),
+);
+
+const examples: Record<string, { label: string; code: string }> =
+  Object.keys(generatedExamples).length > 0 ? generatedExamples : legacyExamples;
+
 export default function PlaygroundPage() {
   const [activeTab, setActiveTab] = useState<PlaygroundTab>("output");
   const [selectedExample, setSelectedExample] = useState<keyof typeof examples>("basics");
@@ -629,6 +667,7 @@ export default function PlaygroundPage() {
   const [editorExternalCode, setEditorExternalCode] = useState(examples.basics.code);
   const [split, setSplit] = useState(60);
   const [running, setRunning] = useState(false);
+  const [programInput, setProgramInput] = useState("");
   const [output, setOutput] = useState("");
   const [tokens, setTokens] = useState("");
   const [ir, setIr] = useState("");
@@ -683,6 +722,16 @@ export default function PlaygroundPage() {
       return;
     }
 
+    const receiveCount = countReceiveStatements(codeRef.current);
+    const resolvedInput = promptRuntimeInput(programInput, receiveCount);
+    if (resolvedInput === null) {
+      setUserMessage("Run canceled before execution.");
+      return;
+    }
+    if (resolvedInput !== programInput) {
+      setProgramInput(resolvedInput);
+    }
+
     setRunning(true);
     setError("");
     setActiveTab("output");
@@ -692,7 +741,7 @@ export default function PlaygroundPage() {
       const response = await fetch("/api/compile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: codeRef.current }),
+        body: JSON.stringify({ code: codeRef.current, input: resolvedInput }),
       });
 
       const data = (await response.json()) as CompileResponse;
@@ -723,7 +772,7 @@ export default function PlaygroundPage() {
       setRunning(false);
       setLastRunMs(Math.round(performance.now() - startedAt));
     }
-  }, [compilerReady, compilerStatusText]);
+  }, [compilerReady, compilerStatusText, programInput]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -757,6 +806,7 @@ export default function PlaygroundPage() {
     setStderr("");
     setUserMessage("");
     setDiagnostics([]);
+    setProgramInput("");
     setJumpToLine(null);
     setLastRunMs(null);
     setActiveTab("output");
@@ -850,6 +900,21 @@ export default function PlaygroundPage() {
         compilerStatusText={compilerStatusText}
         onRefreshCompilerHealth={refreshCompilerHealth}
       />
+
+      <section className="relative z-10 border-b border-white/10 bg-[#121833]/85 px-3 py-2 md:px-4" aria-label="Program input panel">
+        <div className="mb-1 flex items-center justify-between gap-2 text-[11px] uppercase tracking-[0.08em] text-[#99a3d1]">
+          <label htmlFor="playground-input">Program Input (stdin)</label>
+          <span className="text-[#7983b4]">One value per line for each receive statement</span>
+        </div>
+        <textarea
+          id="playground-input"
+          value={programInput}
+          onChange={(event) => setProgramInput(event.target.value)}
+          placeholder={"42\nhello\n3.14"}
+          spellCheck={false}
+          className="h-20 w-full resize-y rounded-md border border-white/15 bg-[#0d1228] px-3 py-2 font-mono text-sm text-[#d7ddff] outline-none transition-colors focus:border-[#6074ff]"
+        />
+      </section>
 
       <main className="relative z-10 flex flex-1 overflow-hidden" aria-label="AstroScript playground workspace">
         <PlaygroundSidebar />

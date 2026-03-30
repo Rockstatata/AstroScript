@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { execFile } from "child_process";
+import { spawn } from "child_process";
 import { mkdir, unlink, writeFile } from "fs/promises";
 import { join } from "path";
 import { randomUUID } from "crypto";
@@ -20,6 +20,16 @@ type CompilerDiagnostic = {
   humanMessage?: string;
   fixHint?: string;
 };
+
+type CompilerRunResult = {
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  timedOut: boolean;
+};
+
+const COMPILER_TIMEOUT_MS = 10000;
+const MAX_OUTPUT_BYTES = 1024 * 1024;
 
 function getLineText(code: string, line?: number): string {
   if (!line || line < 1) {
@@ -198,14 +208,80 @@ function parseCompilerDiagnostics(outputText: string): CompilerDiagnostic[] {
   return diagnostics;
 }
 
+function runCompilerProcess(compilerPath: string, sourceFile: string, input: string): Promise<CompilerRunResult> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(compilerPath, [sourceFile], {
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true,
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+    let outputTooLarge = false;
+
+    const timeoutHandle = setTimeout(() => {
+      timedOut = true;
+      child.kill();
+    }, COMPILER_TIMEOUT_MS);
+
+    const appendChunk = (current: string, chunk: Buffer | string): string => {
+      const nextChunk = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+      const merged = current + nextChunk;
+
+      if (Buffer.byteLength(merged, "utf8") > MAX_OUTPUT_BYTES) {
+        outputTooLarge = true;
+        child.kill();
+      }
+
+      return merged;
+    };
+
+    child.stdout.on("data", (chunk) => {
+      stdout = appendChunk(stdout, chunk);
+    });
+
+    child.stderr.on("data", (chunk) => {
+      stderr = appendChunk(stderr, chunk);
+    });
+
+    child.on("error", (error) => {
+      clearTimeout(timeoutHandle);
+      reject(error);
+    });
+
+    child.on("close", (exitCode) => {
+      clearTimeout(timeoutHandle);
+
+      if (outputTooLarge) {
+        reject(new Error("Compiler output exceeded 1 MB limit."));
+        return;
+      }
+
+      resolve({ stdout, stderr, exitCode, timedOut });
+    });
+
+    child.stdin.on("error", () => {
+      // Ignore broken pipe errors if compiler exits before consuming stdin.
+    });
+    child.stdin.end(input);
+  });
+}
+
 export async function POST(request: NextRequest) {
   let tempFile = "";
 
   try {
-    const { code } = await request.json();
+    const payload = await request.json();
+    const code = payload?.code;
+    const input = payload?.input ?? "";
 
     if (!code || typeof code !== "string") {
       return NextResponse.json({ error: "No code provided" }, { status: 400 });
+    }
+
+    if (typeof input !== "string") {
+      return NextResponse.json({ error: "Program input must be a string" }, { status: 400 });
     }
 
     const compilerPath = await resolveCompilerPathCached();
@@ -225,26 +301,13 @@ export async function POST(request: NextRequest) {
     tempFile = join(tempDir, `${randomUUID()}.as`);
     await writeFile(tempFile, code, "utf-8");
 
-    const result = await new Promise<{ stdout: string; stderr: string }>(
-      (resolve, reject) => {
-        execFile(
-          compilerPath,
-          [tempFile],
-          { timeout: 10000, maxBuffer: 1024 * 1024 },
-          (error, stdout, stderr) => {
-            if (error && !stdout && !stderr) {
-              reject(error);
-              return;
-            }
-            resolve({ stdout: stdout ?? "", stderr: stderr ?? "" });
-          }
-        );
-      }
-    );
+    const result = await runCompilerProcess(compilerPath, tempFile, input);
 
-    const stdoutText = result.stdout.trim();
-    const stderrText = result.stderr.trim();
-    const lines = result.stdout.split("\n");
+    const normalizedStdout = result.stdout.replace(/\r\n/g, "\n");
+    const normalizedStderr = result.stderr.replace(/\r\n/g, "\n");
+    const stdoutText = normalizedStdout.trim();
+    const stderrText = normalizedStderr.trim();
+    const lines = normalizedStdout.split("\n");
     const irStart = lines.findIndex((l) => l.includes("--- Optimized Three Address Code ---"));
     const irEnd = irStart === -1
       ? -1
@@ -270,8 +333,8 @@ export async function POST(request: NextRequest) {
       cCode = lines.slice(cStart, cSliceEnd).join("\n").trim();
     }
 
-    const execLines = lines.filter((l) => l.startsWith("PRINT: "));
-    output = execLines.map((l) => l.replace("PRINT: ", "")).join("\n");
+    const execLines = lines.filter((line) => line.startsWith("PRINT: "));
+    output = execLines.map((line) => line.slice("PRINT: ".length).replace(/\r/g, "")).join("\n");
 
     const tokenLines = lines.filter((l) => /\bTOKEN\b|\bLEXICAL\b|\bPARSER\b/i.test(l));
     tokens = tokenLines.join("\n");
@@ -283,8 +346,23 @@ export async function POST(request: NextRequest) {
       .join("\n")
       .trim();
 
-    if (diagnostics.length > 0 || stderrText) {
-      error = diagnosticText || stderrText;
+    if (result.timedOut) {
+      const timeoutMessage = "Execution timed out. Provide enough Program Input lines for receive statements and retry.";
+      return NextResponse.json({
+        output,
+        tokens,
+        ir,
+        cCode,
+        stdout: stdoutText,
+        stderr: stderrText,
+        error: timeoutMessage,
+        userMessage: timeoutMessage,
+        diagnostics,
+      }, { status: 408 });
+    }
+
+    if (diagnostics.length > 0 || stderrText || result.exitCode !== 0) {
+      error = diagnosticText || stderrText || `Compiler exited with code ${result.exitCode ?? "unknown"}.`;
       const userMessage = buildUserMessage(diagnostics);
       return NextResponse.json({
         output,

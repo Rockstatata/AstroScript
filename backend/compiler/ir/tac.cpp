@@ -58,6 +58,20 @@ bool tryParseInt(const std::string& text, int& value) {
     value = static_cast<int>(signedValue);
     return true;
 }
+
+std::string trimAsciiWhitespace(const std::string& text) {
+    std::size_t start = 0;
+    while (start < text.size() && std::isspace(static_cast<unsigned char>(text[start])) != 0) {
+        ++start;
+    }
+
+    std::size_t end = text.size();
+    while (end > start && std::isspace(static_cast<unsigned char>(text[end - 1])) != 0) {
+        --end;
+    }
+
+    return text.substr(start, end - start);
+}
 }
 
 TACGenerator::TACGenerator() : tempCounter(0), labelCounter(0), nextObjectId(1) {}
@@ -1724,10 +1738,15 @@ void TACGenerator::execute() {
         if (instruction.op == "input") {
             std::string line;
             std::getline(std::cin, line);
-            if (line.empty()) {
+            if (!line.empty() && line.back() == '\r') {
+                line.pop_back();
+            }
+
+            const std::string numericCandidate = trimAsciiWhitespace(line);
+            if (numericCandidate.empty()) {
                 setValue(instruction.result, 0.0);
-            } else if (isNumeric(line)) {
-                setValue(instruction.result, toNumber(line));
+            } else if (isNumeric(numericCandidate)) {
+                setValue(instruction.result, toNumber(numericCandidate));
             } else {
                 setValue(instruction.result, line);
             }

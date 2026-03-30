@@ -6,9 +6,11 @@
     "node": ">=20.11.0"
   },
   "scripts": {
+    "generate:playground-examples": "node scripts/generate-playground-examples.mjs",
     "generate:lang-ref": "node scripts/generate-language-reference.mjs",
-    "dev": "npm run generate:lang-ref && next dev",
-    "build": "npm run generate:lang-ref && next build",
+    "generate:metadata": "npm run generate:lang-ref && npm run generate:playground-examples",
+    "dev": "npm run generate:metadata && next dev",
+    "build": "npm run generate:metadata && next build",
     "start": "next start",
     "lint": "eslint"
   },

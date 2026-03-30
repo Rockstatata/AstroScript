@@ -36,7 +36,7 @@ function highlightCode(code: string, language: DocsCodeBlockProps["language"]) {
     while (i < safeCode.length) {
       // Check for comments
       if (safeCode.substr(i, 2) === "$*") {
-        let endIdx = safeCode.indexOf("*$", i + 2);
+        const endIdx = safeCode.indexOf("*$", i + 2);
         if (endIdx !== -1) {
           result += '<span class="text-[#6b7396]">' + safeCode.substring(i, endIdx + 2) + '</span>';
           i = endIdx + 2;

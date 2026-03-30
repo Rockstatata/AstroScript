@@ -71,6 +71,17 @@ Windows:
 .\backend\compiler\build\astroscript.exe .\examples\comprehensive.as
 ```
 
+Run focused module examples (nested loops, nested conditionals, nested function calls, and more):
+
+```bash
+./backend/compiler/build/astroscript examples/modules/14-nested-loops-grid.as
+./backend/compiler/build/astroscript examples/modules/15-nested-if-else.as
+./backend/compiler/build/astroscript examples/modules/16-nested-function-calls.as
+```
+
+The frontend playground example list is generated from `examples/modules/index.json` and `examples/modules/*.as`.
+Any module example you add there is picked up automatically by `npm run dev` and `npm run build` in `web/`.
+
 ### Run the Website
 
 Requires: Node.js 20.11+

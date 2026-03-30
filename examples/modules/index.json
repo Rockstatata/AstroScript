@@ -1,0 +1,122 @@
+[
+  {
+    "key": "basics",
+    "label": "Module 1: Mission Basics",
+    "file": "01-mission-basics.as",
+    "description": "Entry mission, simple verify, and orbit loop"
+  },
+  {
+    "key": "declarationsTypes",
+    "label": "Module 2: Declarations and Types",
+    "file": "02-declarations-types.as",
+    "description": "Types, alias, constants, arrays, and fleet declarations"
+  },
+  {
+    "key": "operatorsKeywordAndSymbol",
+    "label": "Module 3: Operators (Keyword and Symbol)",
+    "file": "03-operators-keyword-symbol.as",
+    "description": "Keyword operators and symbol operators side by side"
+  },
+  {
+    "key": "comparisonsAndLogic",
+    "label": "Module 4: Comparisons and Logic",
+    "file": "04-comparisons-logic.as",
+    "description": "Relational and logical branching patterns"
+  },
+  {
+    "key": "controlFlow",
+    "label": "Module 5: verify/else_verify/otherwise",
+    "file": "05-control-flow.as",
+    "description": "Multi-branch conditional flow"
+  },
+  {
+    "key": "loopsAndFlowControl",
+    "label": "Module 6: orbit/while/times + coast/stage_sep",
+    "file": "06-loops-flow-control.as",
+    "description": "Loop variants with continue and break behavior"
+  },
+  {
+    "key": "scenarioSwitch",
+    "label": "Module 7: scenario/trajectory/fallback",
+    "file": "07-scenario-switch.as",
+    "description": "Switch-like control flow with fallback"
+  },
+  {
+    "key": "functionsAndReturns",
+    "label": "Module 8: command/back/: and :->",
+    "file": "08-functions-returns.as",
+    "description": "Function declarations and return forms"
+  },
+  {
+    "key": "ioAndMessaging",
+    "label": "Module 9: transmit/broadcast/alarm/receive",
+    "file": "09-io-messaging.as",
+    "description": "Output channels plus runtime input via receive"
+  },
+  {
+    "key": "waitAndMathBuiltins",
+    "label": "Module 10: wait/tick + Math Built-ins",
+    "file": "10-wait-math-builtins.as",
+    "description": "Runtime delay and math built-in functions"
+  },
+  {
+    "key": "modulesDeployThis",
+    "label": "Module 11: OOP (extends/override/super/new)",
+    "file": "11-oop-extends-override.as",
+    "description": "Modules, inheritance, override, and object construction"
+  },
+  {
+    "key": "overloadingAndScope",
+    "label": "Module 12: Overloading + Scoped Variables",
+    "file": "12-overloading-scope.as",
+    "description": "Function/method overloads and block-level shadowing"
+  },
+  {
+    "key": "modeAndAbort",
+    "label": "Module 13: mode + abort",
+    "file": "13-mode-abort.as",
+    "description": "Mode declaration and mission abort"
+  },
+  {
+    "key": "nestedLoopsGrid",
+    "label": "Module 14: Nested Loops Grid",
+    "file": "14-nested-loops-grid.as",
+    "description": "Nested orbit-times loops for grid processing"
+  },
+  {
+    "key": "nestedIfElse",
+    "label": "Module 15: Nested verify/else branches",
+    "file": "15-nested-if-else.as",
+    "description": "Nested if/else trees inside outer conditions"
+  },
+  {
+    "key": "nestedFunctionCalls",
+    "label": "Module 16: Nested Function Calls",
+    "file": "16-nested-function-calls.as",
+    "description": "Function chaining and function-in-function calls"
+  },
+  {
+    "key": "nestedControlFlowMixed",
+    "label": "Module 17: Nested Mixed Control Flow",
+    "file": "17-nested-control-flow-mixed.as",
+    "description": "Nested loops with nested branching and coast control"
+  },
+  {
+    "key": "nestedScenarioLoops",
+    "label": "Module 18: Nested scenario inside loops",
+    "file": "18-nested-scenario-loops.as",
+    "description": "Nested scenario/trajectory blocks in iterative flow"
+  },
+  {
+    "key": "nestedModuleMethods",
+    "label": "Module 19: Nested Module Method Calls",
+    "file": "19-nested-module-methods.as",
+    "description": "Method-to-method calls using this inside modules"
+  },
+  {
+    "key": "arrayFleetMatrix",
+    "label": "Module 20: Array/Fleet Matrix Walk",
+    "file": "20-array-fleet-matrix.as",
+    "description": "Nested indexing patterns over array and fleet storage"
+  }
+]
