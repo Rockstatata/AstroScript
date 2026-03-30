@@ -1,0 +1,1976 @@
+    1: %{
+    2: #include <stdio.h>
+    3: #include <stdlib.h>
+    4: #include <string.h>
+    5: #include <algorithm>
+    6: #include <iostream>
+    7: #include <sstream>
+    8: #include <unordered_map>
+    9: #include <unordered_set>
+   10: #include <vector>
+   11: 
+   12: #include "../semantic/symbol_table.h"
+   13: #include "../ir/tac.h"
+   14: 
+   15: int yylex();
+   16: void yyerror(const char *s);
+   17: extern FILE *yyin;
+   18: extern int yylineno;
+   19: extern char* yytext;
+   20: 
+   21: SymbolTable symbolTable;
+   22: TACGenerator tacGenerator;
+   23: 
+   24: struct ExprAttr {
+   25:     std::string place;
+   26:     double value;
+   27:     bool isConst;
+   28:     bool isIdentifier;
+   29:     std::string typeName;
+   30: };
+   31: 
+   32: struct FieldInfo {
+   33:     std::string typeName;
+   34:     bool isPublic;
+   35:     bool isConstant;
+   36:     bool hasDefault;
+   37:     std::string defaultPlace;
+   38: };
+   39: 
+   40: struct MethodInfo {
+   41:     std::string ownerModule;
+   42:     std::string qualifiedName;
+   43:     std::vector<std::string> parameterTypes;
+   44:     std::string returnType;
+   45:     bool isPublic;
+   46:     bool isOverride;
+   47:     bool isConstructor;
+   48:     int arity;
+   49:     std::string selector;
+   50: };
+   51: 
+   52: struct FunctionOverloadInfo {
+   53:     std::string qualifiedName;
+   54:     std::vector<std::string> parameterTypes;
+   55:     std::string returnType;
+   56:     int arity;
+   57: };
+   58: 
+   59: struct ModuleInfo {
+   60:     std::string name;
+   61:     std::string baseName;
+   62:     std::unordered_map<std::string, FieldInfo> fields;
+   63:     std::unordered_map<std::string, std::vector<MethodInfo>> methods;
+   64: };
+   65: 
+   66: struct IfContext {
+   67:     std::string elseLabel;
+   68:     std::string endLabel;
+   69: };
+   70: 
+   71: struct LoopContext {
+   72:     std::string startLabel;
+   73:     std::string endLabel;
+   74:     std::string continueLabel;
+   75:     std::string iteratorPlace;
+   76:     bool hasIterator;
+   77: };
+   78: 
+   79: struct SwitchContext {
+   80:     std::string exprPlace;
+   81:     std::string endLabel;
+   82:     std::string nextLabel;
+   83:     bool hasDefault;
+   84: };
+   85: 
+   86: std::vector<IfContext> ifStack;
+   87: std::vector<LoopContext> loopStack;
+   88: std::vector<SwitchContext> switchStack;
+   89: std::vector<std::string> currentFunctionParams;
+   90: std::unordered_map<std::string, std::string> currentFunctionParamTypes;
+   91: std::vector<std::string> currentFunctionParamTypesInOrder;
+   92: std::string currentFunctionName;
+   93: std::string currentFunctionQualifiedName;
+   94: std::string currentFunctionReturnType = "VOIDSPACE";
+   95: bool currentFunctionInModule = false;
+   96: bool currentFunctionIsConstructor = false;
+   97: bool currentFunctionIsMethod = false;
+   98: std::string currentFunctionOwnerModule;
+   99: std::unordered_map<std::string, int> functionArity;
+  100: std::unordered_map<std::string, std::unordered_map<std::string, std::string>> functionParameterTypes;
+  101: std::unordered_map<std::string, std::string> functionReturnTypes;
+  102: std::unordered_map<std::string, std::vector<FunctionOverloadInfo>> globalFunctionOverloads;
+  103: std::unordered_map<std::string, std::string> typeAliases;
+  104: std::unordered_set<std::string> constantNames;
+  105: std::unordered_map<std::string, ModuleInfo> moduleTable;
+  106: std::vector<std::unordered_map<std::string, std::string>> variableScopes;
+  107: std::vector<std::unordered_map<std::string, int>> variableScopeLines;
+  108: std::vector<std::unordered_set<std::string>> constantScopes;
+  109: std::string currentModuleName;
+  110: bool currentClassMemberIsPublic = true;
+  111: bool currentClassMemberIsOverride = false;
+  112: std::string pendingModuleName;
+  113: int moduleDepth = 0;
+  114: bool currentFunctionSawValueReturn = false;
+  115: 
+  116: std::string qualifyMethodName(const std::string& moduleName, const std::string& methodName) {
+  117:     return moduleName + "::" + methodName;
+  118: }
+  119: 
+  120: std::string buildSelector(const std::string& methodName, int arity) {
+  121:     return methodName + "#" + std::to_string(arity);
+  122: }
+  123: 
+  124: std::string buildQualifiedFunctionName(const std::string& owner, const std::string& functionName, int arity) {
+  125:     if (!owner.empty()) {
+  126:         return owner + "::" + functionName + "@" + std::to_string(arity);
+  127:     }
+  128:     return functionName + "@" + std::to_string(arity);
+  129: }
+  130: 
+  131: void pushScope() {
+  132:     variableScopes.push_back({});
+  133:     variableScopeLines.push_back({});
+  134:     constantScopes.push_back({});
+  135: }
+  136: 
+  137: void popScope() {
+  138:     if (!variableScopes.empty()) {
+  139:         variableScopes.pop_back();
+  140:     }
+  141:     if (!variableScopeLines.empty()) {
+  142:         variableScopeLines.pop_back();
+  143:     }
+  144:     if (!constantScopes.empty()) {
+  145:         constantScopes.pop_back();
+  146:     }
+  147: }
+  148: 
+  149: bool isDeclaredInCurrentScopeOnly(const std::string& name) {
+  150:     if (variableScopes.empty()) {
+  151:         return false;
+  152:     }
+  153:     return variableScopes.back().find(name) != variableScopes.back().end();
+  154: }
+  155: 
+  156: int declaredLineInCurrentScope(const std::string& name) {
+  157:     if (variableScopeLines.empty()) {
+  158:         return -1;
+  159:     }
+  160: 
+  161:     auto lineIt = variableScopeLines.back().find(name);
+  162:     if (lineIt == variableScopeLines.back().end()) {
+  163:         return -1;
+  164:     }
+  165: 
+  166:     return lineIt->second;
+  167: }
+  168: 
+  169: void reportRedeclaration(const std::string& name) {
+  170:     int previousLine = declaredLineInCurrentScope(name);
+  171:     if (previousLine > 0) {
+  172:         printf("Semantic Error at line %d: variable %s already declared in this scope at line %d\n", yylineno, name.c_str(), previousLine);
+  173:     } else {
+  174:         printf("Semantic Error at line %d: variable %s already declared\n", yylineno, name.c_str());
+  175:     }
+  176: }
+  177: 
+  178: bool declareScopedName(const std::string& name, const std::string& typeName, bool isConstant, int lineNumber) {
+  179:     if (isDeclaredInCurrentScopeOnly(name)) {
+  180:         return false;
+  181:     }
+  182: 
+  183:     if (variableScopes.empty()) {
+  184:         pushScope();
+  185:     }
+  186: 
+  187:     variableScopes.back()[name] = typeName;
+  188:     variableScopeLines.back()[name] = lineNumber;
+  189:     if (isConstant) {
+  190:         constantScopes.back().insert(name);
+  191:         constantNames.insert(name);
+  192:     }
+  193: 
+  194:     if (!symbolTable.exists(name)) {
+  195:         symbolTable.insert(name, typeName, lineNumber);
+  196:     }
+  197: 
+  198:     return true;
+  199: }
+  200: 
+  201: bool isConstantName(const std::string& name) {
+  202:     for (auto scopeIt = constantScopes.rbegin(); scopeIt != constantScopes.rend(); ++scopeIt) {
+  203:         if (scopeIt->find(name) != scopeIt->end()) {
+  204:             return true;
+  205:         }
+  206:     }
+  207:     return constantNames.find(name) != constantNames.end();
+  208: }
+  209: 
+  210: bool isModuleKnown(const std::string& moduleName) {
+  211:     return moduleTable.find(moduleName) != moduleTable.end();
+  212: }
+  213: 
+  214: bool isModuleType(const std::string& typeName) {
+  215:     return typeName.rfind("MODULE:", 0) == 0;
+  216: }
+  217: 
+  218: std::string moduleNameFromType(const std::string& typeName) {
+  219:     if (!isModuleType(typeName)) {
+  220:         return "";
+  221:     }
+  222:     return typeName.substr(std::string("MODULE:").size());
+  223: }
+  224: 
+  225: bool isDerivedFrom(const std::string& childModule, const std::string& parentModule) {
+  226:     if (childModule.empty() || parentModule.empty()) {
+  227:         return false;
+  228:     }
+  229: 
+  230:     std::string cursor = childModule;
+  231:     while (!cursor.empty()) {
+  232:         if (cursor == parentModule) {
+  233:             return true;
+  234:         }
+  235:         auto moduleIt = moduleTable.find(cursor);
+  236:         if (moduleIt == moduleTable.end()) {
+  237:             break;
+  238:         }
+  239:         cursor = moduleIt->second.baseName;
+  240:     }
+  241: 
+  242:     return false;
+  243: }
+  244: 
+  245: bool resolveFieldInHierarchy(const std::string& moduleName,
+  246:                             const std::string& fieldName,
+  247:                             FieldInfo& resolvedField,
+  248:                             std::string& ownerModule) {
+  249:     std::string cursor = moduleName;
+  250:     while (!cursor.empty()) {
+  251:         auto moduleIt = moduleTable.find(cursor);
+  252:         if (moduleIt == moduleTable.end()) {
+  253:             break;
+  254:         }
+  255:         auto fieldIt = moduleIt->second.fields.find(fieldName);
+  256:         if (fieldIt != moduleIt->second.fields.end()) {
+  257:             resolvedField = fieldIt->second;
+  258:             ownerModule = cursor;
+  259:             return true;
+  260:         }
+  261:         cursor = moduleIt->second.baseName;
+  262:     }
+  263:     return false;
+  264: }
+  265: 
+  266: bool resolveMethodInHierarchy(const std::string& moduleName,
+  267:                              const std::string& methodName,
+  268:                              int argumentCount,
+  269:                              MethodInfo& resolvedMethod,
+  270:                              std::string& ownerModule) {
+  271:     std::string cursor = moduleName;
+  272:     while (!cursor.empty()) {
+  273:         auto moduleIt = moduleTable.find(cursor);
+  274:         if (moduleIt == moduleTable.end()) {
+  275:             break;
+  276:         }
+  277:         auto methodGroupIt = moduleIt->second.methods.find(methodName);
+  278:         if (methodGroupIt != moduleIt->second.methods.end()) {
+  279:             for (const MethodInfo& candidate : methodGroupIt->second) {
+  280:                 if (candidate.arity == argumentCount) {
+  281:                     resolvedMethod = candidate;
+  282:                     ownerModule = cursor;
+  283:                     return true;
+  284:                 }
+  285:             }
+  286:         }
+  287:         cursor = moduleIt->second.baseName;
+  288:     }
+  289:     return false;
+  290: }
+  291: 
+  292: bool resolveGlobalFunctionOverload(const std::string& functionName,
+  293:                                   int argumentCount,
+  294:                                   FunctionOverloadInfo& resolved) {
+  295:     auto functionIt = globalFunctionOverloads.find(functionName);
+  296:     if (functionIt == globalFunctionOverloads.end()) {
+  297:         return false;
+  298:     }
+  299: 
+  300:     for (const FunctionOverloadInfo& overload : functionIt->second) {
+  301:         if (overload.arity == argumentCount) {
+  302:             resolved = overload;
+  303:             return true;
+  304:         }
+  305:     }
+  306: 
+  307:     return false;
+  308: }
+  309: 
+  310: bool canAccessMember(bool isPublicMember, const std::string& ownerModule) {
+  311:     if (isPublicMember) {
+  312:         return true;
+  313:     }
+  314:     return currentFunctionInModule && currentFunctionOwnerModule == ownerModule;
+  315: }
+  316: 
+  317: bool isParameterName(const std::string& name) {
+  318:     for (const std::string& param : currentFunctionParams) {
+  319:         if (param == name) {
+  320:             return true;
+  321:         }
+  322:     }
+  323:     return false;
+  324: }
+  325: 
+  326: bool isDeclaredName(const std::string& name) {
+  327:     if (isParameterName(name)) {
+  328:         return true;
+  329:     }
+  330: 
+  331:     for (auto scopeIt = variableScopes.rbegin(); scopeIt != variableScopes.rend(); ++scopeIt) {
+  332:         if (scopeIt->find(name) != scopeIt->end()) {
+  333:             return true;
+  334:         }
+  335:     }
+  336: 
+  337:     return false;
+  338: }
+  339: 
+  340: std::string baseType(const std::string& typeName) {
+  341:     if (typeName.size() > 2 && typeName.substr(typeName.size() - 2) == "[]") {
+  342:         return typeName.substr(0, typeName.size() - 2);
+  343:     }
+  344:     return typeName;
+  345: }
+  346: 
+  347: bool isNumericType(const std::string& typeName) {
+  348:     const std::string type = baseType(typeName);
+  349:     return type == "COUNT" || type == "REAL" || type == "PRECISE" || type == "FLAG";
+  350: }
+  351: 
+  352: bool isStringType(const std::string& typeName) {
+  353:     return baseType(typeName) == "SYMBOL";
+  354: }
+  355: 
+  356: bool isBoolType(const std::string& typeName) {
+  357:     return baseType(typeName) == "FLAG";
+  358: }
+  359: 
+  360: std::string numericResultType(const std::string& leftType, const std::string& rightType) {
+  361:     const std::string left = baseType(leftType);
+  362:     const std::string right = baseType(rightType);
+  363:     if (left == "PRECISE" || right == "PRECISE") {
+  364:         return "PRECISE";
+  365:     }
+  366:     if (left == "REAL" || right == "REAL") {
+  367:         return "REAL";
+  368:     }
+  369:     return "COUNT";
+  370: }
+  371: 
+  372: std::string declaredTypeOf(const std::string& name) {
+  373:     auto paramIt = currentFunctionParamTypes.find(name);
+  374:     if (paramIt != currentFunctionParamTypes.end()) {
+  375:         return paramIt->second;
+  376:     }
+  377: 
+  378:     for (auto scopeIt = variableScopes.rbegin(); scopeIt != variableScopes.rend(); ++scopeIt) {
+  379:         auto valueIt = scopeIt->find(name);
+  380:         if (valueIt != scopeIt->end()) {
+  381:             return valueIt->second;
+  382:         }
+  383:     }
+  384: 
+  385:     return "UNKNOWN";
+  386: }
+  387: 
+  388: bool areTypesCompatible(const std::string& targetType, const std::string& sourceType) {
+  389:     const std::string target = baseType(targetType);
+  390:     const std::string source = baseType(sourceType);
+  391: 
+  392:     if (target == "UNKNOWN" || source == "UNKNOWN") {
+  393:         return true;
+  394:     }
+  395: 
+  396:     if (target == source) {
+  397:         return true;
+  398:     }
+  399: 
+  400:     if (isModuleType(target) && isModuleType(source)) {
+  401:         const std::string targetModule = moduleNameFromType(target);
+  402:         const std::string sourceModule = moduleNameFromType(source);
+  403:         return isDerivedFrom(sourceModule, targetModule);
+  404:     }
+  405: 
+  406:     if (isNumericType(target) && isNumericType(source)) {
+  407:         return true;
+  408:     }
+  409: 
+  410:     return false;
+  411: }
+  412: 
+  413: std::string toText(double value) {
+  414:     std::ostringstream stream;
+  415:     stream << value;
+  416:     return stream.str();
+  417: }
+  418: 
+  419: ExprAttr* makeExpr(const std::string& place, double value, bool isConst, bool isIdentifier = false, const std::string& typeName = "UNKNOWN") {
+  420:     return new ExprAttr{place, value, isConst, isIdentifier, typeName};
+  421: }
+  422: 
+  423: ExprAttr* makeNumericExpr(double value) {
+  424:     return makeExpr(toText(value), value, true, false, "COUNT");
+  425: }
+  426: %}
+  427: 
+  428: %code requires {
+  429:     struct ExprAttr;
+  430: }
+  431: 
+  432: 
+  433: %union {
+  434:     int intval;
+  435:     double floatval;
+  436:     char* str;
+  437:     ExprAttr* expr;
+  438: }
+  439: 
+  440: %token MISSION LAUNCH SUCCESS ABORT
+  441: %token MODULE DEPLOY EXTENDS PUBLIC PRIVATE THIS NEW SUPER OVERRIDE
+  442: %token TELEMETRY LIMIT ALIAS FLEET MODE
+  443: %token COMMAND BACK TRANSMIT
+  444: %token BROADCAST RECEIVE ALARM
+  445: %token VERIFY ELSE_VERIFY OTHERWISE
+  446: %token ORBIT SCENARIO TRAJECTORY FALLBACK
+  447: %token STAGE_SEP COAST
+  448: %token WAIT TICK
+  449: %token ROOT FLR CEIL ABS LOGARITHM SINE COSINE TAN ASINE ACOSINE ATAN PRIME
+  450: %token WHILE TIMES
+  451: 
+  452: %token COUNT REAL PRECISE FLAG SYMBOL VOIDSPACE
+  453: 
+  454: %token ADD MINUS MUL DIVIDE MOD POWER
+  455: %token AND OR NOT XOR
+  456: 
+  457: %token LT GT LE GE EQ NEQ
+  458: %token ASSIGN
+  459: %token RETTYPE
+  460: 
+  461: %token LBRACKET RBRACKET
+  462: %token LBRACE RBRACE LPAREN RPAREN
+  463: %token MEMBER_DOT DOT COMMA COLON
+  464: 
+  465: %token <intval> INT_LITERAL
+  466: %token <floatval> FLOAT_LITERAL
+  467: %token <str> IDENTIFIER STRING_LITERAL
+  468: 
+  469: %type <str> type
+  470: %type <expr> expression
+  471: %type <expr> field_initializer
+  472: %type <intval> argument_list argument_list_opt
+  473: %type <intval> parameter_list parameter_list_opt
+  474: 
+  475: %error-verbose
+  476: 
+  477: %nonassoc LOWER_THAN_ELSE
+  478: %nonassoc ELSE_VERIFY OTHERWISE
+  479: %left OR XOR
+  480: %left AND
+  481: %right NOT
+  482: %left LT GT LE GE EQ NEQ
+  483: %left ADD MINUS
+  484: %left MUL DIVIDE MOD
+  485: %right POWER
+  486: 
+  487: %%
+  488: 
+  489: program
+  490:     : mission_block SUCCESS
+  491:     ;
+  492: 
+  493: mission_block
+  494:     : MISSION IDENTIFIER LAUNCH block
+  495:     ;
+  496: 
+  497: block
+  498:     : LBRACE
+  499:       {
+  500:           pushScope();
+  501:           tacGenerator.emitScopeBegin();
+  502:       }
+  503:       statement_list RBRACE
+  504:       {
+  505:           tacGenerator.emitScopeEnd();
+  506:           popScope();
+  507:       }
+  508:     ;
+  509: 
+  510: statement_list
+  511:     : statement_list statement
+  512:     |
+  513:     ;
+  514: 
+  515: statement
+  516:     : declaration
+  517:     | assignment
+  518:     | function_definition
+  519:     | print_stmt
+  520:     | input_stmt
+  521:     | deploy_statement
+  522:     | expression DOT
+  523:       {
+  524:           delete $1;
+  525:       }
+  526:     | control_statement
+  527:     | loop_statement
+  528:     | switch_statement
+  529:     | module_definition
+  530:     | wait_statement
+  531:     | STAGE_SEP DOT
+  532:       {
+  533:           if (!loopStack.empty()) {
+  534:               tacGenerator.emitGoto(loopStack.back().endLabel);
+  535:           } else if (!switchStack.empty()) {
+  536:               tacGenerator.emitGoto(switchStack.back().endLabel);
+  537:           } else {
+  538:               printf("Semantic Error at line %d: stage_sep used outside loop/scenario\n", yylineno);
+  539:           }
+  540:       }
+  541:     | COAST DOT
+  542:       {
+  543:           if (!loopStack.empty()) {
+  544:               tacGenerator.emitGoto(loopStack.back().continueLabel);
+  545:           } else {
+  546:               printf("Semantic Error at line %d: coast used outside loop\n", yylineno);
+  547:           }
+  548:       }
+  549:     | error DOT
+  550:       {
+  551:           printf("SYNTAX ERROR at line %d: invalid statement; skipped until '.' to continue parsing\n", yylineno);
+  552:           yyerrok;
+  553:       }
+  554:     | return_statement
+  555:     | ABORT DOT
+  556:     ;
+  557: 
+  558: declaration
+  559:     : TELEMETRY type IDENTIFIER DOT
+  560:       {
+  561:           if (!declareScopedName($3, $2, false, yylineno)) {
+  562:               reportRedeclaration($3);
+  563:           } else {
+  564:               tacGenerator.emitDeclare($2, $3);
+  565:           }
+  566:       }
+  567:     | TELEMETRY type IDENTIFIER ASSIGN expression DOT
+  568:       {
+  569:           if (!declareScopedName($3, $2, false, yylineno)) {
+  570:               reportRedeclaration($3);
+  571:           } else {
+  572:               tacGenerator.emitDeclare($2, $3);
+  573:               if (!areTypesCompatible($2, $5->typeName)) {
+  574:                   printf("Semantic Error at line %d: cannot initialize %s (%s) with %s\n", yylineno, $3, $2, $5->typeName.c_str());
+  575:               }
+  576:               tacGenerator.emitAssign($3, $5->place);
+  577:           }
+  578:           delete $5;
+  579:       }
+  580:     | LIMIT type IDENTIFIER ASSIGN expression DOT
+  581:       {
+  582:           if (!declareScopedName($3, $2, true, yylineno)) {
+  583:               reportRedeclaration($3);
+  584:           } else {
+  585:               tacGenerator.emitDeclare($2, $3);
+  586:               if (!areTypesCompatible($2, $5->typeName)) {
+  587:                   printf("Semantic Error at line %d: cannot initialize constant %s (%s) with %s\n", yylineno, $3, $2, $5->typeName.c_str());
+  588:               }
+  589:               tacGenerator.emitAssign($3, $5->place);
+  590:           }
+  591:           delete $5;
+  592:       }
+  593:     | ALIAS type IDENTIFIER DOT
+  594:       {
+  595:           typeAliases[$3] = $2;
+  596:       }
+  597:     | FLEET type IDENTIFIER DOT
+  598:       {
+  599:           const std::string arrayType = std::string($2) + "[]";
+  600:           if (!declareScopedName($3, arrayType, false, yylineno)) {
+  601:               reportRedeclaration($3);
+  602:           } else {
+  603:               tacGenerator.emitArrayDecl($2, $3, "0");
+  604:           }
+  605:       }
+  606:     | MODE IDENTIFIER LBRACE mode_body RBRACE
+  607:     | TELEMETRY type IDENTIFIER LBRACKET INT_LITERAL RBRACKET DOT
+  608:       {
+  609:           const std::string arrayType = std::string($2) + "[]";
+  610:           if (!declareScopedName($3, arrayType, false, yylineno)) {
+  611:               reportRedeclaration($3);
+  612:           } else {
+  613:               tacGenerator.emitArrayDecl($2, $3, toText(static_cast<double>($5)));
+  614:           }
+  615:       }
+  616:     | TELEMETRY type IDENTIFIER LBRACKET INT_LITERAL RBRACKET ASSIGN expression DOT
+  617:       {
+  618:           const std::string arrayType = std::string($2) + "[]";
+  619:           if (!declareScopedName($3, arrayType, false, yylineno)) {
+  620:               reportRedeclaration($3);
+  621:           } else {
+  622:               tacGenerator.emitArrayDecl($2, $3, toText(static_cast<double>($5)));
+  623:               tacGenerator.emitArrayStore($3, "0", $8->place);
+  624:           }
+  625:           delete $8;
+  626:       }
+  627:     ;
+  628: 
+  629: assignment
+  630:     : IDENTIFIER ASSIGN expression DOT
+  631:       {
+  632:           if (!isDeclaredName($1)) {
+  633:               if (currentFunctionInModule) {
+  634:                   FieldInfo fieldInfo;
+  635:                   std::string ownerModule;
+  636:                   if (resolveFieldInHierarchy(currentFunctionOwnerModule, $1, fieldInfo, ownerModule)) {
+  637:                       if (!canAccessMember(fieldInfo.isPublic, ownerModule)) {
+  638:                           printf("Semantic Error at line %d: field %s is private in module %s\n", yylineno, $1, ownerModule.c_str());
+  639:                       } else if (fieldInfo.isConstant) {
+  640:                           printf("Semantic Error at line %d: cannot assign to constant field %s\n", yylineno, $1);
+  641:                       } else {
+  642:                           if (!areTypesCompatible(fieldInfo.typeName, $3->typeName)) {
+  643:                               printf("Semantic Error at line %d: type mismatch assigning %s to field %s (%s)\n", yylineno, $3->typeName.c_str(), $1, fieldInfo.typeName.c_str());
+  644:                           }
+  645:                           tacGenerator.emitFieldStore("this", $1, $3->place);
+  646:                       }
+  647:                   } else {
+  648:                       printf("Semantic Error at line %d: variable %s not declared\n", yylineno, $1);
+  649:                   }
+  650:               } else {
+  651:                   printf("Semantic Error at line %d: variable %s not declared\n", yylineno, $1);
+  652:               }
+  653:           } else if (isConstantName($1)) {
+  654:               printf("Semantic Error at line %d: cannot assign to constant %s\n", yylineno, $1);
+  655:           } else {
+  656:               std::string destinationType = declaredTypeOf($1);
+  657:               if (!areTypesCompatible(destinationType, $3->typeName)) {
+  658:                   printf("Semantic Error at line %d: type mismatch assigning %s to %s (%s)\n", yylineno, $3->typeName.c_str(), $1, destinationType.c_str());
+  659:               }
+  660:               tacGenerator.emitAssign($1, $3->place);
+  661:           }
+  662:           delete $3;
+  663:       }
+  664:     | IDENTIFIER MEMBER_DOT IDENTIFIER ASSIGN expression DOT
+  665:       {
+  666:           if (!isDeclaredName($1)) {
+  667:               printf("Semantic Error at line %d: object %s not declared\n", yylineno, $1);
+  668:           } else {
+  669:               std::string objectType = declaredTypeOf($1);
+  670:               if (!isModuleType(objectType)) {
+  671:                   printf("Semantic Error at line %d: %s is not an object instance\n", yylineno, $1);
+  672:               } else {
+  673:                   const std::string objectModule = moduleNameFromType(objectType);
+  674:                   FieldInfo fieldInfo;
+  675:                   std::string ownerModule;
+  676:                   if (!resolveFieldInHierarchy(objectModule, $3, fieldInfo, ownerModule)) {
+  677:                       printf("Semantic Error at line %d: field %s not found in module %s\n", yylineno, $3, objectModule.c_str());
+  678:                   } else if (!canAccessMember(fieldInfo.isPublic, ownerModule)) {
+  679:                       printf("Semantic Error at line %d: field %s is private in module %s\n", yylineno, $3, ownerModule.c_str());
+  680:                   } else if (fieldInfo.isConstant) {
+  681:                       printf("Semantic Error at line %d: cannot assign to constant field %s\n", yylineno, $3);
+  682:                   } else {
+  683:                       if (!areTypesCompatible(fieldInfo.typeName, $5->typeName)) {
+  684:                           printf("Semantic Error at line %d: type mismatch assigning %s to field %s (%s)\n", yylineno, $5->typeName.c_str(), $3, fieldInfo.typeName.c_str());
+  685:                       }
+  686:                       tacGenerator.emitFieldStore($1, $3, $5->place);
+  687:                   }
+  688:               }
+  689:           }
+  690:           delete $5;
+  691:       }
+  692:     | THIS MEMBER_DOT IDENTIFIER ASSIGN expression DOT
+  693:       {
+  694:           if (!currentFunctionInModule) {
+  695:               printf("Semantic Error at line %d: this used outside module function context\n", yylineno);
+  696:           } else {
+  697:               FieldInfo fieldInfo;
+  698:               std::string ownerModule;
+  699:               if (!resolveFieldInHierarchy(currentFunctionOwnerModule, $3, fieldInfo, ownerModule)) {
+  700:                   printf("Semantic Error at line %d: field %s not found in module %s\n", yylineno, $3, currentFunctionOwnerModule.c_str());
+  701:               } else if (!canAccessMember(fieldInfo.isPublic, ownerModule)) {
+  702:                   printf("Semantic Error at line %d: field %s is private in module %s\n", yylineno, $3, ownerModule.c_str());
+  703:               } else if (fieldInfo.isConstant) {
+  704:                   printf("Semantic Error at line %d: cannot assign to constant field %s\n", yylineno, $3);
+  705:               } else {
+  706:                   if (!areTypesCompatible(fieldInfo.typeName, $5->typeName)) {
+  707:                       printf("Semantic Error at line %d: type mismatch assigning %s to field %s (%s)\n", yylineno, $5->typeName.c_str(), $3, fieldInfo.typeName.c_str());
+  708:                   }
+  709:                   tacGenerator.emitFieldStore("this", $3, $5->place);
+  710:               }
+  711:           }
+  712:           delete $5;
+  713:       }
+  714:     | IDENTIFIER LBRACKET expression RBRACKET ASSIGN expression DOT
+  715:       {
+  716:           if (!isDeclaredName($1)) {
+  717:               printf("Semantic Error at line %d: array %s not declared\n", yylineno, $1);
+  718:           } else {
+  719:               std::string arrayType = declaredTypeOf($1);
+  720:               std::string elementType = baseType(arrayType);
+  721:               if (!areTypesCompatible(elementType, $6->typeName)) {
+  722:                   printf("Semantic Error at line %d: type mismatch storing %s into %s[%s]\n", yylineno, $6->typeName.c_str(), $1, $3->place.c_str());
+  723:               }
+  724:               tacGenerator.emitArrayStore($1, $3->place, $6->place);
+  725:           }
+  726:           delete $3;
+  727:           delete $6;
+  728:       }
+  729:     ;
+  730: 
+  731: deploy_statement
+  732:     : DEPLOY IDENTIFIER IDENTIFIER DOT
+  733:       {
+  734:           const std::string deployedType = std::string("MODULE:") + $2;
+  735:           if (!isModuleKnown($2)) {
+  736:               printf("Semantic Error at line %d: module %s is not defined\n", yylineno, $2);
+  737:           } else if (!declareScopedName($3, deployedType, false, yylineno)) {
+  738:               reportRedeclaration($3);
+  739:           } else {
+  740:               tacGenerator.emitDeclare(deployedType, $3);
+  741:               tacGenerator.emitObjectNew($2, $3);
+  742: 
+  743:               MethodInfo ctorInfo;
+  744:               std::string ctorOwner;
+  745:               if (resolveMethodInHierarchy($2, $2, 0, ctorInfo, ctorOwner)) {
+  746:                   std::string initTemp = tacGenerator.emitMethodCall($3, ctorInfo.selector, 0);
+  747:                   (void)initTemp;
+  748:               }
+  749:           }
+  750:       }
+  751:     | DEPLOY IDENTIFIER IDENTIFIER LPAREN argument_list_opt RPAREN DOT
+  752:       {
+  753:           const std::string deployedType = std::string("MODULE:") + $2;
+  754:           if (!isModuleKnown($2)) {
+  755:               printf("Semantic Error at line %d: module %s is not defined\n", yylineno, $2);
+  756:           } else if (!declareScopedName($3, deployedType, false, yylineno)) {
+  757:               reportRedeclaration($3);
+  758:           } else {
+  759:               tacGenerator.emitDeclare(deployedType, $3);
+  760:               tacGenerator.emitObjectNew($2, $3);
+  761: 
+  762:               MethodInfo ctorInfo;
+  763:               std::string ctorOwner;
+  764:               if (resolveMethodInHierarchy($2, $2, $5, ctorInfo, ctorOwner)) {
+  765:                   if (ctorInfo.arity != $5) {
+  766:                       printf("Semantic Error at line %d: constructor %s expects %d arguments but got %d\n", yylineno, $2, static_cast<int>(ctorInfo.parameterTypes.size()), $5);
+  767:                   }
+  768:                   std::string initTemp = tacGenerator.emitMethodCall($3, ctorInfo.selector, $5);
+  769:                   (void)initTemp;
+  770:               } else if ($5 != 0) {
+  771:                   printf("Semantic Error at line %d: module %s has no constructor accepting %d arguments\n", yylineno, $2, $5);
+  772:               }
+  773:           }
+  774:       }
+  775:     | DEPLOY IDENTIFIER DOT
+  776:       {
+  777:           const std::string deployedType = std::string("MODULE:") + $2;
+  778:           if (!isModuleKnown($2)) {
+  779:               printf("Semantic Error at line %d: module %s is not defined\n", yylineno, $2);
+  780:           } else if (!declareScopedName($2, deployedType, false, yylineno)) {
+  781:               reportRedeclaration($2);
+  782:           } else {
+  783:               tacGenerator.emitDeclare(deployedType, $2);
+  784:               tacGenerator.emitObjectNew($2, $2);
+  785: 
+  786:               MethodInfo ctorInfo;
+  787:               std::string ctorOwner;
+  788:               if (resolveMethodInHierarchy($2, $2, 0, ctorInfo, ctorOwner)) {
+  789:                   std::string initTemp = tacGenerator.emitMethodCall($2, ctorInfo.selector, 0);
+  790:                   (void)initTemp;
+  791:               }
+  792:           }
+  793:       }
+  794:     ;
+  795: 
+  796: print_stmt
+  797:     : TRANSMIT expression DOT
+  798:       {
+  799:           tacGenerator.emitPrint($2->place);
+  800:           delete $2;
+  801:       }
+  802:         | BROADCAST expression DOT
+  803:             {
+  804:                     tacGenerator.emitPrint($2->place);
+  805:                     delete $2;
+  806:             }
+  807:         | ALARM expression DOT
+  808:             {
+  809:                     tacGenerator.emitPrint($2->place);
+  810:                     delete $2;
+  811:             }
+  812:     ;
+  813: 
+  814: input_stmt
+  815:     : RECEIVE IDENTIFIER DOT
+  816:       {
+  817:           if (!isDeclaredName($2)) {
+  818:               printf("Semantic Error at line %d: variable %s not declared\n", yylineno, $2);
+  819:           } else if (isConstantName($2)) {
+  820:               printf("Semantic Error at line %d: cannot receive input into constant %s\n", yylineno, $2);
+  821:           } else {
+  822:               tacGenerator.emitInput($2);
+  823:           }
+  824:       }
+  825:     | RECEIVE IDENTIFIER LBRACKET expression RBRACKET DOT
+  826:       {
+  827:           if (!isDeclaredName($2)) {
+  828:               printf("Semantic Error at line %d: array %s not declared\n", yylineno, $2);
+  829:           } else {
+  830:               std::string temp = tacGenerator.newTemp();
+  831:               tacGenerator.emitInput(temp);
+  832:               tacGenerator.emitArrayStore($2, $4->place, temp);
+  833:           }
+  834:           delete $4;
+  835:       }
+  836:     ;
+  837: 
+  838: return_statement
+  839:     : BACK DOT
+  840:       {
+  841:                     if (currentFunctionReturnType != "VOIDSPACE") {
+  842:                             printf("Semantic Error at line %d: function %s must return a value of type %s\n", yylineno, currentFunctionName.c_str(), currentFunctionReturnType.c_str());
+  843:                     }
+  844:           tacGenerator.emitFunctionReturn();
+  845:       }
+  846:     | BACK expression DOT
+  847:       {
+  848:           if (currentFunctionReturnType == "VOIDSPACE") {
+  849:               printf("Semantic Error at line %d: voidspace function cannot return a value\n", yylineno);
+  850:           } else if (!areTypesCompatible(currentFunctionReturnType, $2->typeName)) {
+  851:               printf("Semantic Error at line %d: return type mismatch, expected %s but got %s\n", yylineno, currentFunctionReturnType.c_str(), $2->typeName.c_str());
+  852:           }
+  853:           currentFunctionSawValueReturn = true;
+  854:           tacGenerator.emitFunctionReturn($2->place);
+  855:           delete $2;
+  856:       }
+  857:     ;
+  858: 
+  859: mode_body
+  860:     : mode_body mode_entry
+  861:     |
+  862:     ;
+  863: 
+  864: mode_entry
+  865:     : TRAJECTORY INT_LITERAL DOT
+  866:     | FALLBACK INT_LITERAL DOT
+  867:     ;
+  868: 
+  869: type
+  870:     : COUNT { $$ = strdup("COUNT"); }
+  871:     | REAL { $$ = strdup("REAL"); }
+  872:     | PRECISE { $$ = strdup("PRECISE"); }
+  873:     | FLAG { $$ = strdup("FLAG"); }
+  874:     | SYMBOL { $$ = strdup("SYMBOL"); }
+  875:     | VOIDSPACE { $$ = strdup("VOIDSPACE"); }
+  876:     | IDENTIFIER
+  877:       {
+  878:           auto aliasIt = typeAliases.find($1);
+  879:                     if (aliasIt != typeAliases.end()) {
+  880:               $$ = strdup(aliasIt->second.c_str());
+  881:                     } else if (isModuleKnown($1)) {
+  882:                             std::string moduleType = std::string("MODULE:") + $1;
+  883:                             $$ = strdup(moduleType.c_str());
+  884:                     } else {
+  885:                             printf("Semantic Error at line %d: unknown type alias/module %s\n", yylineno, $1);
+  886:                             $$ = strdup("COUNT");
+  887:           }
+  888:       }
+  889:     ;
+  890: 
+  891: field_initializer
+  892:         : INT_LITERAL
+  893:             {
+  894:                     $$ = makeExpr(toText(static_cast<double>($1)), static_cast<double>($1), true, false, "COUNT");
+  895:             }
+  896:         | FLOAT_LITERAL
+  897:             {
+  898:                     $$ = makeExpr(toText($1), $1, true, false, "REAL");
+  899:             }
+  900:         | STRING_LITERAL
+  901:             {
+  902:                     $$ = makeExpr($1, 0.0, true, false, "SYMBOL");
+  903:             }
+  904:         ;
+  905: 
+  906: control_statement
+  907:     : VERIFY LPAREN expression RPAREN
+  908:       {
+  909:           IfContext ctx{tacGenerator.newLabel(), tacGenerator.newLabel()};
+  910:           tacGenerator.emitIfFalseGoto($3->place, ctx.elseLabel);
+  911:           ifStack.push_back(ctx);
+  912:           delete $3;
+  913:       }
+  914:       block
+  915:       {
+  916:           IfContext& ctx = ifStack.back();
+  917:           tacGenerator.emitGoto(ctx.endLabel);
+  918:           tacGenerator.emitLabel(ctx.elseLabel);
+  919:       }
+  920:       else_verify_chain otherwise_clause
+  921:       {
+  922:           IfContext ctx = ifStack.back();
+  923:           ifStack.pop_back();
+  924:           tacGenerator.emitLabel(ctx.endLabel);
+  925:       }
+  926:     ;
+  927: 
+  928: else_verify_chain
+  929:     : ELSE_VERIFY LPAREN expression RPAREN
+  930:       {
+  931:           IfContext& ctx = ifStack.back();
+  932:           std::string nextLabel = tacGenerator.newLabel();
+  933:           tacGenerator.emitIfFalseGoto($3->place, nextLabel);
+  934:           ctx.elseLabel = nextLabel;
+  935:           delete $3;
+  936:       }
+  937:       block
+  938:       {
+  939:           IfContext& ctx = ifStack.back();
+  940:           tacGenerator.emitGoto(ctx.endLabel);
+  941:           tacGenerator.emitLabel(ctx.elseLabel);
+  942:       }
+  943:       else_verify_chain
+  944:     | %prec LOWER_THAN_ELSE
+  945:     ;
+  946: 
+  947: otherwise_clause
+  948:     : OTHERWISE block
+  949:     |
+  950:     ;
+  951: 
+  952: loop_statement
+  953:     : ORBIT LPAREN
+  954:       {
+  955:           LoopContext ctx{tacGenerator.newLabel(), tacGenerator.newLabel(), "", "", false};
+  956:           ctx.continueLabel = ctx.startLabel;
+  957:           loopStack.push_back(ctx);
+  958:           tacGenerator.emitLabel(ctx.startLabel);
+  959:       }
+  960:       expression RPAREN
+  961:       {
+  962:           LoopContext& ctx = loopStack.back();
+  963:           tacGenerator.emitIfFalseGoto($4->place, ctx.endLabel);
+  964:           delete $4;
+  965:       }
+  966:       block
+  967:       {
+  968:           LoopContext ctx = loopStack.back();
+  969:           loopStack.pop_back();
+  970:           tacGenerator.emitGoto(ctx.startLabel);
+  971:           tacGenerator.emitLabel(ctx.endLabel);
+  972:       }
+  973:     | ORBIT WHILE LPAREN
+  974:       {
+  975:                     LoopContext ctx{tacGenerator.newLabel(), tacGenerator.newLabel(), "", "", false};
+  976:                     ctx.continueLabel = ctx.startLabel;
+  977:           loopStack.push_back(ctx);
+  978:           tacGenerator.emitLabel(ctx.startLabel);
+  979:       }
+  980:       expression RPAREN
+  981:       {
+  982:           LoopContext& ctx = loopStack.back();
+  983:           tacGenerator.emitIfFalseGoto($5->place, ctx.endLabel);
+  984:           delete $5;
+  985:       }
+  986:       block
+  987:       {
+  988:           LoopContext ctx = loopStack.back();
+  989:           loopStack.pop_back();
+  990:           tacGenerator.emitGoto(ctx.startLabel);
+  991:           tacGenerator.emitLabel(ctx.endLabel);
+  992:       }
+  993:     | ORBIT TIMES LPAREN expression COLON expression COLON expression RPAREN
+  994:       {
+  995:                     LoopContext ctx{tacGenerator.newLabel(), tacGenerator.newLabel(), tacGenerator.newLabel(), $4->place, true};
+  996:           loopStack.push_back(ctx);
+  997:           tacGenerator.emitAssign($4->place, $6->place);
+  998:           tacGenerator.emitLabel(ctx.startLabel);
+  999:           std::string conditionTemp = tacGenerator.emitBinary("<", $4->place, $8->place);
+ 1000:           tacGenerator.emitIfFalseGoto(conditionTemp, ctx.endLabel);
+ 1001:           delete $4;
+ 1002:           delete $6;
+ 1003:           delete $8;
+ 1004:       }
+ 1005:       block
+ 1006:       {
+ 1007:           LoopContext ctx = loopStack.back();
+ 1008:           loopStack.pop_back();
+ 1009:           if (ctx.hasIterator) {
+ 1010:               tacGenerator.emitLabel(ctx.continueLabel);
+ 1011:               std::string incrementTemp = tacGenerator.emitBinary("+", ctx.iteratorPlace, "1");
+ 1012:               tacGenerator.emitAssign(ctx.iteratorPlace, incrementTemp);
+ 1013:           }
+ 1014:           tacGenerator.emitGoto(ctx.startLabel);
+ 1015:           tacGenerator.emitLabel(ctx.endLabel);
+ 1016:       }
+ 1017:     ;
+ 1018: 
+ 1019: switch_statement
+ 1020:     : SCENARIO LPAREN expression RPAREN
+ 1021:       {
+ 1022:           SwitchContext ctx{$3->place, tacGenerator.newLabel(), "", false};
+ 1023:           switchStack.push_back(ctx);
+ 1024:           delete $3;
+ 1025:       }
+ 1026:       LBRACE case_list RBRACE
+ 1027:       {
+ 1028:           SwitchContext ctx = switchStack.back();
+ 1029:           switchStack.pop_back();
+ 1030:           if (!ctx.nextLabel.empty()) {
+ 1031:               tacGenerator.emitLabel(ctx.nextLabel);
+ 1032:           }
+ 1033:           tacGenerator.emitLabel(ctx.endLabel);
+ 1034:       }
+ 1035:     ;
+ 1036: 
+ 1037: case_list
+ 1038:     : case_list case_entry
+ 1039:     |
+ 1040:     ;
+ 1041: 
+ 1042: case_entry
+ 1043:     : TRAJECTORY INT_LITERAL COLON
+ 1044:       {
+ 1045:           SwitchContext& ctx = switchStack.back();
+ 1046:           if (!ctx.nextLabel.empty()) {
+ 1047:               tacGenerator.emitLabel(ctx.nextLabel);
+ 1048:           }
+ 1049:           std::string compareTemp = tacGenerator.emitBinary("==", ctx.exprPlace, toText(static_cast<double>($2)));
+ 1050:           ctx.nextLabel = tacGenerator.newLabel();
+ 1051:           tacGenerator.emitIfFalseGoto(compareTemp, ctx.nextLabel);
+ 1052:       }
+ 1053:       statement_list
+ 1054:       {
+ 1055:           SwitchContext& ctx = switchStack.back();
+ 1056:           tacGenerator.emitGoto(ctx.endLabel);
+ 1057:       }
+ 1058:     | FALLBACK COLON
+ 1059:       {
+ 1060:           SwitchContext& ctx = switchStack.back();
+ 1061:           if (!ctx.nextLabel.empty()) {
+ 1062:               tacGenerator.emitLabel(ctx.nextLabel);
+ 1063:               ctx.nextLabel.clear();
+ 1064:           }
+ 1065:           ctx.hasDefault = true;
+ 1066:       }
+ 1067:       statement_list
+ 1068:     ;
+ 1069: 
+ 1070: wait_statement
+ 1071:     : WAIT INT_LITERAL TICK DOT
+ 1072:       {
+ 1073:           tacGenerator.emit("wait", toText(static_cast<double>($2)), "", "");
+ 1074:       }
+ 1075:     ;
+ 1076: 
+ 1077: module_definition
+ 1078:     : MODULE IDENTIFIER
+ 1079:       {
+ 1080:           pendingModuleName = $2;
+ 1081: 
+ 1082:           if (isModuleKnown($2)) {
+ 1083:               printf("Semantic Error at line %d: module %s already defined\n", yylineno, $2);
+ 1084:           } else {
+ 1085:               ModuleInfo moduleInfo;
+ 1086:               moduleInfo.name = $2;
+ 1087:               moduleTable[$2] = moduleInfo;
+ 1088:           }
+ 1089: 
+ 1090:           ++moduleDepth;
+ 1091:           currentModuleName = $2;
+ 1092:           currentClassMemberIsPublic = true;
+ 1093:           currentClassMemberIsOverride = false;
+ 1094:       }
+ 1095:       inheritance LBRACE class_body RBRACE
+ 1096:       {
+ 1097:           const auto moduleIt = moduleTable.find(currentModuleName);
+ 1098:           if (moduleIt != moduleTable.end()) {
+ 1099:               tacGenerator.registerClass(moduleIt->second.name, moduleIt->second.baseName);
+ 1100:           }
+ 1101: 
+ 1102:           --moduleDepth;
+ 1103:           currentModuleName.clear();
+ 1104:           pendingModuleName.clear();
+ 1105:           currentClassMemberIsPublic = true;
+ 1106:           currentClassMemberIsOverride = false;
+ 1107:       }
+ 1108:     ;
+ 1109: 
+ 1110: inheritance
+ 1111:     : EXTENDS IDENTIFIER
+ 1112:       {
+ 1113:           auto currentModuleIt = moduleTable.find(pendingModuleName);
+ 1114:           if (currentModuleIt == moduleTable.end()) {
+ 1115:               printf("Semantic Error at line %d: invalid module inheritance context for %s\n", yylineno, pendingModuleName.c_str());
+ 1116:           } else if (!isModuleKnown($2)) {
+ 1117:               printf("Semantic Error at line %d: base module %s is not defined\n", yylineno, $2);
+ 1118:           } else if (std::string($2) == pendingModuleName || isDerivedFrom($2, pendingModuleName)) {
+ 1119:               printf("Semantic Error at line %d: cyclic inheritance involving %s and %s\n", yylineno, pendingModuleName.c_str(), $2);
+ 1120:           } else {
+ 1121:               currentModuleIt->second.baseName = $2;
+ 1122:           }
+ 1123:       }
+ 1124:     |
+ 1125:       {
+ 1126:       }
+ 1127:     ;
+ 1128: 
+ 1129: class_body
+ 1130:     : class_body class_member
+ 1131:     |
+ 1132:     ;
+ 1133: 
+ 1134: class_member
+ 1135:     :
+ 1136:       {
+ 1137:           currentClassMemberIsPublic = true;
+ 1138:           currentClassMemberIsOverride = false;
+ 1139:       }
+ 1140:       class_member_core
+ 1141:     | PUBLIC
+ 1142:       {
+ 1143:           currentClassMemberIsPublic = true;
+ 1144:           currentClassMemberIsOverride = false;
+ 1145:       }
+ 1146:       class_member_core
+ 1147:     | PRIVATE
+ 1148:       {
+ 1149:           currentClassMemberIsPublic = false;
+ 1150:           currentClassMemberIsOverride = false;
+ 1151:       }
+ 1152:       class_member_core
+ 1153:     | OVERRIDE
+ 1154:       {
+ 1155:           currentClassMemberIsPublic = true;
+ 1156:           currentClassMemberIsOverride = true;
+ 1157:       }
+ 1158:       function_definition
+ 1159:     | PUBLIC OVERRIDE
+ 1160:       {
+ 1161:           currentClassMemberIsPublic = true;
+ 1162:           currentClassMemberIsOverride = true;
+ 1163:       }
+ 1164:       function_definition
+ 1165:     | PRIVATE OVERRIDE
+ 1166:       {
+ 1167:           currentClassMemberIsPublic = false;
+ 1168:           currentClassMemberIsOverride = true;
+ 1169:       }
+ 1170:       function_definition
+ 1171:     ;
+ 1172: 
+ 1173: class_member_core
+ 1174:     : TELEMETRY type IDENTIFIER DOT
+ 1175:       {
+ 1176:           auto moduleIt = moduleTable.find(currentModuleName);
+ 1177:           if (moduleIt == moduleTable.end()) {
+ 1178:               printf("Semantic Error at line %d: invalid field declaration context for %s\n", yylineno, $3);
+ 1179:           } else if (moduleIt->second.fields.find($3) != moduleIt->second.fields.end()) {
+ 1180:               printf("Semantic Error at line %d: field %s already defined in module %s\n", yylineno, $3, currentModuleName.c_str());
+ 1181:           } else {
+ 1182:               FieldInfo fieldInfo{$2, currentClassMemberIsPublic, false, false, ""};
+ 1183:               moduleIt->second.fields[$3] = fieldInfo;
+ 1184:               tacGenerator.registerField(currentModuleName, $3, "0");
+ 1185:           }
+ 1186:       }
+ 1187:     | TELEMETRY type IDENTIFIER ASSIGN field_initializer DOT
+ 1188:       {
+ 1189:           auto moduleIt = moduleTable.find(currentModuleName);
+ 1190:           if (moduleIt == moduleTable.end()) {
+ 1191:               printf("Semantic Error at line %d: invalid field declaration context for %s\n", yylineno, $3);
+ 1192:           } else if (moduleIt->second.fields.find($3) != moduleIt->second.fields.end()) {
+ 1193:               printf("Semantic Error at line %d: field %s already defined in module %s\n", yylineno, $3, currentModuleName.c_str());
+ 1194:           } else {
+ 1195:               if (!areTypesCompatible($2, $5->typeName)) {
+ 1196:                   printf("Semantic Error at line %d: cannot initialize field %s (%s) with %s\n", yylineno, $3, $2, $5->typeName.c_str());
+ 1197:               }
+ 1198:               FieldInfo fieldInfo{$2, currentClassMemberIsPublic, false, true, $5->place};
+ 1199:               moduleIt->second.fields[$3] = fieldInfo;
+ 1200:               tacGenerator.registerField(currentModuleName, $3, $5->place);
+ 1201:           }
+ 1202:           delete $5;
+ 1203:       }
+ 1204:     | LIMIT type IDENTIFIER ASSIGN field_initializer DOT
+ 1205:       {
+ 1206:           auto moduleIt = moduleTable.find(currentModuleName);
+ 1207:           if (moduleIt == moduleTable.end()) {
+ 1208:               printf("Semantic Error at line %d: invalid field declaration context for %s\n", yylineno, $3);
+ 1209:           } else if (moduleIt->second.fields.find($3) != moduleIt->second.fields.end()) {
+ 1210:               printf("Semantic Error at line %d: field %s already defined in module %s\n", yylineno, $3, currentModuleName.c_str());
+ 1211:           } else {
+ 1212:               if (!areTypesCompatible($2, $5->typeName)) {
+ 1213:                   printf("Semantic Error at line %d: cannot initialize constant field %s (%s) with %s\n", yylineno, $3, $2, $5->typeName.c_str());
+ 1214:               }
+ 1215:               FieldInfo fieldInfo{$2, currentClassMemberIsPublic, true, true, $5->place};
+ 1216:               moduleIt->second.fields[$3] = fieldInfo;
+ 1217:               tacGenerator.registerField(currentModuleName, $3, $5->place);
+ 1218:           }
+ 1219:           delete $5;
+ 1220:       }
+ 1221:     | function_definition
+ 1222:     ;
+ 1223: 
+ 1224: function_definition
+ 1225:     : COMMAND IDENTIFIER LPAREN
+ 1226:       {
+ 1227:           currentFunctionName = $2;
+ 1228:           currentFunctionParams.clear();
+ 1229:           currentFunctionParamTypes.clear();
+ 1230:           currentFunctionParamTypesInOrder.clear();
+ 1231:           currentFunctionInModule = moduleDepth > 0;
+ 1232:           currentFunctionSawValueReturn = false;
+ 1233:           currentFunctionOwnerModule = currentFunctionInModule ? currentModuleName : "";
+ 1234:           currentFunctionIsMethod = currentFunctionInModule;
+ 1235:           currentFunctionIsConstructor = currentFunctionInModule && (currentFunctionName == currentModuleName);
+ 1236:           currentFunctionQualifiedName.clear();
+ 1237:       }
+ 1238:       parameter_list_opt RPAREN return_type type
+ 1239:       {
+ 1240:           if (currentFunctionIsConstructor && std::string($8) != "VOIDSPACE") {
+ 1241:               printf("Semantic Error at line %d: constructor %s must have return type voidspace\n", yylineno, currentFunctionName.c_str());
+ 1242:           }
+ 1243: 
+ 1244:           currentFunctionQualifiedName = buildQualifiedFunctionName(
+ 1245:               currentFunctionInModule ? currentFunctionOwnerModule : "",
+ 1246:               currentFunctionName,
+ 1247:               $5);
+ 1248: 
+ 1249:           functionArity[currentFunctionQualifiedName] = currentFunctionIsMethod ? ($5 + 1) : $5;
+ 1250:           functionParameterTypes[currentFunctionQualifiedName] = currentFunctionParamTypes;
+ 1251:           functionReturnTypes[currentFunctionQualifiedName] = $8;
+ 1252:           currentFunctionReturnType = $8;
+ 1253: 
+ 1254:           if (currentFunctionInModule) {
+ 1255:               currentFunctionParamTypes["this"] = std::string("MODULE:") + currentFunctionOwnerModule;
+ 1256: 
+ 1257:               auto moduleIt = moduleTable.find(currentFunctionOwnerModule);
+ 1258:               if (moduleIt == moduleTable.end()) {
+ 1259:                   printf("Semantic Error at line %d: invalid module function context for %s\n", yylineno, currentFunctionName.c_str());
+ 1260:               } else {
+ 1261:                   const std::string& baseModule = moduleIt->second.baseName;
+ 1262:                   MethodInfo inheritedMethod;
+ 1263:                   std::string inheritedOwner;
+ 1264:                   bool hasInheritedMethod = false;
+ 1265:                   if (!baseModule.empty()) {
+ 1266:                       hasInheritedMethod = resolveMethodInHierarchy(baseModule, currentFunctionName, $5, inheritedMethod, inheritedOwner);
+ 1267:                   }
+ 1268: 
+ 1269:                   if (currentClassMemberIsOverride && !hasInheritedMethod) {
+ 1270:                       printf("Semantic Error at line %d: method %s marked override but no base method exists\n", yylineno, currentFunctionName.c_str());
+ 1271:                   }
+ 1272: 
+ 1273:                   if (hasInheritedMethod && currentClassMemberIsOverride) {
+ 1274:                       if (inheritedMethod.arity != $5) {
+ 1275:                           printf("Semantic Error at line %d: override of %s has mismatched parameter count\n", yylineno, currentFunctionName.c_str());
+ 1276:                       }
+ 1277:                   }
+ 1278: 
+ 1279:                   MethodInfo methodInfo;
+ 1280:                   methodInfo.ownerModule = currentFunctionOwnerModule;
+ 1281:                   methodInfo.qualifiedName = currentFunctionQualifiedName;
+ 1282:                   methodInfo.parameterTypes = currentFunctionParamTypesInOrder;
+ 1283:                   methodInfo.returnType = $8;
+ 1284:                   methodInfo.isPublic = currentClassMemberIsPublic;
+ 1285:                   methodInfo.isOverride = currentClassMemberIsOverride;
+ 1286:                   methodInfo.isConstructor = currentFunctionIsConstructor;
+ 1287:                   methodInfo.arity = $5;
+ 1288:                   methodInfo.selector = buildSelector(currentFunctionName, $5);
+ 1289: 
+ 1290:                   std::vector<MethodInfo>& overloads = moduleIt->second.methods[currentFunctionName];
+ 1291:                   bool duplicateSignature = false;
+ 1292:                   for (const MethodInfo& existing : overloads) {
+ 1293:                       if (existing.arity == methodInfo.arity) {
+ 1294:                           duplicateSignature = true;
+ 1295:                           break;
+ 1296:                       }
+ 1297:                   }
+ 1298: 
+ 1299:                   if (duplicateSignature) {
+ 1300:                       printf("Semantic Error at line %d: method %s with %d parameters already defined in module %s\n", yylineno, currentFunctionName.c_str(), $5, currentFunctionOwnerModule.c_str());
+ 1301:                   } else {
+ 1302:                       overloads.push_back(methodInfo);
+ 1303:                       tacGenerator.registerMethod(currentFunctionOwnerModule, methodInfo.selector, currentFunctionQualifiedName);
+ 1304:                   }
+ 1305:               }
+ 1306:           } else {
+ 1307:               FunctionOverloadInfo overloadInfo;
+ 1308:               overloadInfo.qualifiedName = currentFunctionQualifiedName;
+ 1309:               overloadInfo.parameterTypes = currentFunctionParamTypesInOrder;
+ 1310:               overloadInfo.returnType = $8;
+ 1311:               overloadInfo.arity = $5;
+ 1312: 
+ 1313:               std::vector<FunctionOverloadInfo>& overloads = globalFunctionOverloads[currentFunctionName];
+ 1314:               bool duplicateSignature = false;
+ 1315:               for (const FunctionOverloadInfo& existing : overloads) {
+ 1316:                   if (existing.arity == overloadInfo.arity) {
+ 1317:                       duplicateSignature = true;
+ 1318:                       break;
+ 1319:                   }
+ 1320:               }
+ 1321: 
+ 1322:               if (duplicateSignature) {
+ 1323:                   printf("Semantic Error at line %d: function %s with %d parameters already defined\n", yylineno, currentFunctionName.c_str(), $5);
+ 1324:               } else {
+ 1325:                   overloads.push_back(overloadInfo);
+ 1326:               }
+ 1327:           }
+ 1328: 
+ 1329:           tacGenerator.emitFunctionBegin(currentFunctionQualifiedName);
+ 1330:           if (currentFunctionIsMethod) {
+ 1331:               tacGenerator.emitParamDef("this");
+ 1332:           }
+ 1333:           for (const std::string& parameterName : currentFunctionParams) {
+ 1334:               tacGenerator.emitParamDef(parameterName);
+ 1335:           }
+ 1336:       }
+ 1337:       block
+ 1338:       {
+ 1339:           if (currentFunctionReturnType != "VOIDSPACE" && !currentFunctionSawValueReturn) {
+ 1340:               // Keep execution flowing but flag implicit missing return in non-voidspace functions.
+ 1341:               printf("Semantic Error at line %d: function %s may exit without explicit back value\n", yylineno, currentFunctionName.c_str());
+ 1342:           }
+ 1343:           tacGenerator.emitFunctionReturn();
+ 1344:                     tacGenerator.emitFunctionEnd(currentFunctionQualifiedName);
+ 1345:           currentFunctionParams.clear();
+ 1346:           currentFunctionParamTypes.clear();
+ 1347:                     currentFunctionParamTypesInOrder.clear();
+ 1348:           currentFunctionReturnType = "VOIDSPACE";
+ 1349:                     currentFunctionName.clear();
+ 1350:                     currentFunctionQualifiedName.clear();
+ 1351:                     currentFunctionOwnerModule.clear();
+ 1352:                     currentFunctionIsConstructor = false;
+ 1353:                     currentFunctionIsMethod = false;
+ 1354:           currentFunctionInModule = false;
+ 1355:                     currentFunctionSawValueReturn = false;
+ 1356:                     currentClassMemberIsOverride = false;
+ 1357:       }
+ 1358:     ;
+ 1359: 
+ 1360: return_type
+ 1361:     : COLON
+ 1362:     | RETTYPE
+ 1363:     ;
+ 1364: 
+ 1365: parameter_list_opt
+ 1366:     : parameter_list { $$ = $1; }
+ 1367:     | { $$ = 0; }
+ 1368:     ;
+ 1369: 
+ 1370: parameter_list
+ 1371:     : parameter_list COMMA parameter
+ 1372:       {
+ 1373:           $$ = $1 + 1;
+ 1374:       }
+ 1375:     | parameter
+ 1376:       {
+ 1377:           $$ = 1;
+ 1378:       }
+ 1379:     ;
+ 1380: 
+ 1381: parameter
+ 1382:     : type IDENTIFIER
+ 1383:       {
+ 1384:           currentFunctionParams.push_back($2);
+ 1385:                     currentFunctionParamTypes[$2] = $1;
+ 1386:                     currentFunctionParamTypesInOrder.push_back($1);
+ 1387:       }
+ 1388:     ;
+ 1389: 
+ 1390: argument_list_opt
+ 1391:     : argument_list { $$ = $1; }
+ 1392:     | { $$ = 0; }
+ 1393:     ;
+ 1394: 
+ 1395: argument_list
+ 1396:     : expression
+ 1397:       {
+ 1398:           tacGenerator.emitParam($1->place);
+ 1399:           delete $1;
+ 1400:           $$ = 1;
+ 1401:       }
+ 1402:     | argument_list COMMA expression
+ 1403:       {
+ 1404:           tacGenerator.emitParam($3->place);
+ 1405:           delete $3;
+ 1406:           $$ = $1 + 1;
+ 1407:       }
+ 1408:     ;
+ 1409: 
+ 1410: expression
+ 1411:         : expression LT expression
+ 1412:             {
+ 1413:                 std::string place = tacGenerator.emitBinary("<", $1->place, $3->place);
+ 1414:                 if (!areTypesCompatible($1->typeName, $3->typeName)) {
+ 1415:                     printf("Semantic Error at line %d: incompatible types for comparison (%s, %s)\n", yylineno, $1->typeName.c_str(), $3->typeName.c_str());
+ 1416:                 }
+ 1417:                 $$ = makeExpr(place, ($1->value < $3->value) ? 1.0 : 0.0, $1->isConst && $3->isConst, false, "FLAG");
+ 1418:                 delete $1;
+ 1419:                 delete $3;
+ 1420:             }
+ 1421:         | expression GT expression
+ 1422:             {
+ 1423:                 std::string place = tacGenerator.emitBinary(">", $1->place, $3->place);
+ 1424:                 if (!areTypesCompatible($1->typeName, $3->typeName)) {
+ 1425:                     printf("Semantic Error at line %d: incompatible types for comparison (%s, %s)\n", yylineno, $1->typeName.c_str(), $3->typeName.c_str());
+ 1426:                 }
+ 1427:                 $$ = makeExpr(place, ($1->value > $3->value) ? 1.0 : 0.0, $1->isConst && $3->isConst, false, "FLAG");
+ 1428:                 delete $1;
+ 1429:                 delete $3;
+ 1430:             }
+ 1431:         | expression LE expression
+ 1432:             {
+ 1433:                 std::string place = tacGenerator.emitBinary("<=", $1->place, $3->place);
+ 1434:                 if (!areTypesCompatible($1->typeName, $3->typeName)) {
+ 1435:                     printf("Semantic Error at line %d: incompatible types for comparison (%s, %s)\n", yylineno, $1->typeName.c_str(), $3->typeName.c_str());
+ 1436:                 }
+ 1437:                 $$ = makeExpr(place, ($1->value <= $3->value) ? 1.0 : 0.0, $1->isConst && $3->isConst, false, "FLAG");
+ 1438:                 delete $1;
+ 1439:                 delete $3;
+ 1440:             }
+ 1441:         | expression GE expression
+ 1442:             {
+ 1443:                 std::string place = tacGenerator.emitBinary(">=", $1->place, $3->place);
+ 1444:                 if (!areTypesCompatible($1->typeName, $3->typeName)) {
+ 1445:                     printf("Semantic Error at line %d: incompatible types for comparison (%s, %s)\n", yylineno, $1->typeName.c_str(), $3->typeName.c_str());
+ 1446:                 }
+ 1447:                 $$ = makeExpr(place, ($1->value >= $3->value) ? 1.0 : 0.0, $1->isConst && $3->isConst, false, "FLAG");
+ 1448:                 delete $1;
+ 1449:                 delete $3;
+ 1450:             }
+ 1451:         | expression EQ expression
+ 1452:             {
+ 1453:                 std::string place = tacGenerator.emitBinary("==", $1->place, $3->place);
+ 1454:                 if (!areTypesCompatible($1->typeName, $3->typeName)) {
+ 1455:                     printf("Semantic Error at line %d: incompatible types for equality (%s, %s)\n", yylineno, $1->typeName.c_str(), $3->typeName.c_str());
+ 1456:                 }
+ 1457:                 $$ = makeExpr(place, ($1->value == $3->value) ? 1.0 : 0.0, $1->isConst && $3->isConst, false, "FLAG");
+ 1458:                 delete $1;
+ 1459:                 delete $3;
+ 1460:             }
+ 1461:         | expression NEQ expression
+ 1462:             {
+ 1463:                 std::string place = tacGenerator.emitBinary("!=", $1->place, $3->place);
+ 1464:                 if (!areTypesCompatible($1->typeName, $3->typeName)) {
+ 1465:                     printf("Semantic Error at line %d: incompatible types for inequality (%s, %s)\n", yylineno, $1->typeName.c_str(), $3->typeName.c_str());
+ 1466:                 }
+ 1467:                 $$ = makeExpr(place, ($1->value != $3->value) ? 1.0 : 0.0, $1->isConst && $3->isConst, false, "FLAG");
+ 1468:                 delete $1;
+ 1469:                 delete $3;
+ 1470:             }
+ 1471:         | expression ADD expression
+ 1472:       {
+ 1473:           if (!isNumericType($1->typeName) && !isStringType($1->typeName)) {
+ 1474:               printf("Semantic Error at line %d: invalid left operand type for add: %s\n", yylineno, $1->typeName.c_str());
+ 1475:           }
+ 1476:           if (!isNumericType($3->typeName) && !isStringType($3->typeName)) {
+ 1477:               printf("Semantic Error at line %d: invalid right operand type for add: %s\n", yylineno, $3->typeName.c_str());
+ 1478:           }
+ 1479:           std::string place = tacGenerator.emitBinary("+", $1->place, $3->place);
+ 1480:           std::string resultType = (isStringType($1->typeName) || isStringType($3->typeName))
+ 1481:               ? "SYMBOL"
+ 1482:               : numericResultType($1->typeName, $3->typeName);
+ 1483:           $$ = makeExpr(place, 0.0, false, false, resultType);
+ 1484:           delete $1;
+ 1485:           delete $3;
+ 1486:       }
+ 1487:     | expression MINUS expression
+ 1488:       {
+ 1489:           if (!isNumericType($1->typeName) || !isNumericType($3->typeName)) {
+ 1490:               printf("Semantic Error at line %d: minus requires numeric operands\n", yylineno);
+ 1491:           }
+ 1492:           std::string place = tacGenerator.emitBinary("-", $1->place, $3->place);
+ 1493:           $$ = makeExpr(place, 0.0, false, false, numericResultType($1->typeName, $3->typeName));
+ 1494:           delete $1;
+ 1495:           delete $3;
+ 1496:       }
+ 1497:     | expression MUL expression
+ 1498:       {
+ 1499:           if (!isNumericType($1->typeName) || !isNumericType($3->typeName)) {
+ 1500:               printf("Semantic Error at line %d: mul requires numeric operands\n", yylineno);
+ 1501:           }
+ 1502:           std::string place = tacGenerator.emitBinary("*", $1->place, $3->place);
+ 1503:           $$ = makeExpr(place, 0.0, false, false, numericResultType($1->typeName, $3->typeName));
+ 1504:           delete $1;
+ 1505:           delete $3;
+ 1506:       }
+ 1507:     | expression DIVIDE expression
+ 1508:       {
+ 1509:           if (!isNumericType($1->typeName) || !isNumericType($3->typeName)) {
+ 1510:               printf("Semantic Error at line %d: divide requires numeric operands\n", yylineno);
+ 1511:           }
+ 1512:           std::string place = tacGenerator.emitBinary("/", $1->place, $3->place);
+ 1513:           $$ = makeExpr(place, 0.0, false, false, numericResultType($1->typeName, $3->typeName));
+ 1514:           delete $1;
+ 1515:           delete $3;
+ 1516:       }
+ 1517:         | expression MOD expression
+ 1518:             {
+ 1519:                     if (!isNumericType($1->typeName) || !isNumericType($3->typeName)) {
+ 1520:                             printf("Semantic Error at line %d: mod requires numeric operands\n", yylineno);
+ 1521:                     }
+ 1522:                     std::string place = tacGenerator.emitBinary("%", $1->place, $3->place);
+ 1523:                                         $$ = makeExpr(place, 0.0, false, false, "COUNT");
+ 1524:                     delete $1;
+ 1525:                     delete $3;
+ 1526:             }
+ 1527:         | expression POWER expression
+ 1528:             {
+ 1529:                     if (!isNumericType($1->typeName) || !isNumericType($3->typeName)) {
+ 1530:                             printf("Semantic Error at line %d: power requires numeric operands\n", yylineno);
+ 1531:                     }
+ 1532:                     std::string place = tacGenerator.emitBinary("**", $1->place, $3->place);
+ 1533:                                         $$ = makeExpr(place, 0.0, false, false, numericResultType($1->typeName, $3->typeName));
+ 1534:                     delete $1;
+ 1535:                     delete $3;
+ 1536:             }
+ 1537:         | expression AND expression
+ 1538:             {
+ 1539:                     if (!isNumericType($1->typeName) || !isNumericType($3->typeName)) {
+ 1540:                             printf("Semantic Error at line %d: AND requires boolean/numeric operands\n", yylineno);
+ 1541:                     }
+ 1542:                     std::string place = tacGenerator.emitBinary("AND", $1->place, $3->place);
+ 1543:                                         $$ = makeExpr(place, 0.0, false, false, "FLAG");
+ 1544:                     delete $1;
+ 1545:                     delete $3;
+ 1546:             }
+ 1547:         | expression OR expression
+ 1548:             {
+ 1549:                     if (!isNumericType($1->typeName) || !isNumericType($3->typeName)) {
+ 1550:                             printf("Semantic Error at line %d: OR requires boolean/numeric operands\n", yylineno);
+ 1551:                     }
+ 1552:                     std::string place = tacGenerator.emitBinary("OR", $1->place, $3->place);
+ 1553:                                         $$ = makeExpr(place, 0.0, false, false, "FLAG");
+ 1554:                     delete $1;
+ 1555:                     delete $3;
+ 1556:             }
+ 1557:         | expression XOR expression
+ 1558:             {
+ 1559:                     if (!isNumericType($1->typeName) || !isNumericType($3->typeName)) {
+ 1560:                             printf("Semantic Error at line %d: XOR requires boolean/numeric operands\n", yylineno);
+ 1561:                     }
+ 1562:                     std::string place = tacGenerator.emitBinary("XOR", $1->place, $3->place);
+ 1563:                                         $$ = makeExpr(place, 0.0, false, false, "FLAG");
+ 1564:                     delete $1;
+ 1565:                     delete $3;
+ 1566:             }
+ 1567:         | NOT expression
+ 1568:             {
+ 1569:                     if (!isNumericType($2->typeName) && !isBoolType($2->typeName)) {
+ 1570:                             printf("Semantic Error at line %d: NOT requires boolean/numeric operand\n", yylineno);
+ 1571:                     }
+ 1572:                     std::string place = tacGenerator.emitBinary("==", $2->place, "0");
+ 1573:                                         $$ = makeExpr(place, 0.0, false, false, "FLAG");
+ 1574:                     delete $2;
+ 1575:             }
+ 1576:     | ROOT LPAREN expression RPAREN
+ 1577:       {
+ 1578:           if (!isNumericType($3->typeName)) {
+ 1579:               printf("Semantic Error at line %d: root() requires numeric operand\n", yylineno);
+ 1580:           }
+ 1581:           std::string place = tacGenerator.emitUnary("root", $3->place);
+ 1582:           $$ = makeExpr(place, 0.0, false, false, "REAL");
+ 1583:           delete $3;
+ 1584:       }
+ 1585:     | FLR LPAREN expression RPAREN
+ 1586:       {
+ 1587:           if (!isNumericType($3->typeName)) {
+ 1588:               printf("Semantic Error at line %d: flr() requires numeric operand\n", yylineno);
+ 1589:           }
+ 1590:           std::string place = tacGenerator.emitUnary("flr", $3->place);
+ 1591:           $$ = makeExpr(place, 0.0, false, false, "COUNT");
+ 1592:           delete $3;
+ 1593:       }
+ 1594:     | CEIL LPAREN expression RPAREN
+ 1595:       {
+ 1596:           if (!isNumericType($3->typeName)) {
+ 1597:               printf("Semantic Error at line %d: ceil() requires numeric operand\n", yylineno);
+ 1598:           }
+ 1599:           std::string place = tacGenerator.emitUnary("ceil", $3->place);
+ 1600:           $$ = makeExpr(place, 0.0, false, false, "COUNT");
+ 1601:           delete $3;
+ 1602:       }
+ 1603:     | ABS LPAREN expression RPAREN
+ 1604:       {
+ 1605:           if (!isNumericType($3->typeName)) {
+ 1606:               printf("Semantic Error at line %d: abs() requires numeric operand\n", yylineno);
+ 1607:           }
+ 1608:           std::string place = tacGenerator.emitUnary("abs", $3->place);
+ 1609:           $$ = makeExpr(place, 0.0, false, false, numericResultType($3->typeName, $3->typeName));
+ 1610:           delete $3;
+ 1611:       }
+ 1612:     | LOGARITHM LPAREN expression RPAREN
+ 1613:       {
+ 1614:           if (!isNumericType($3->typeName)) {
+ 1615:               printf("Semantic Error at line %d: logarithm() requires numeric operand\n", yylineno);
+ 1616:           }
+ 1617:           std::string place = tacGenerator.emitUnary("logarithm", $3->place);
+ 1618:           $$ = makeExpr(place, 0.0, false, false, "REAL");
+ 1619:           delete $3;
+ 1620:       }
+ 1621:     | SINE LPAREN expression RPAREN
+ 1622:       {
+ 1623:           if (!isNumericType($3->typeName)) {
+ 1624:               printf("Semantic Error at line %d: sine() requires numeric operand\n", yylineno);
+ 1625:           }
+ 1626:           std::string place = tacGenerator.emitUnary("sine", $3->place);
+ 1627:           $$ = makeExpr(place, 0.0, false, false, "REAL");
+ 1628:           delete $3;
+ 1629:       }
+ 1630:     | COSINE LPAREN expression RPAREN
+ 1631:       {
+ 1632:           if (!isNumericType($3->typeName)) {
+ 1633:               printf("Semantic Error at line %d: cosine() requires numeric operand\n", yylineno);
+ 1634:           }
+ 1635:           std::string place = tacGenerator.emitUnary("cosine", $3->place);
+ 1636:           $$ = makeExpr(place, 0.0, false, false, "REAL");
+ 1637:           delete $3;
+ 1638:       }
+ 1639:     | TAN LPAREN expression RPAREN
+ 1640:       {
+ 1641:           if (!isNumericType($3->typeName)) {
+ 1642:               printf("Semantic Error at line %d: tan() requires numeric operand\n", yylineno);
+ 1643:           }
+ 1644:           std::string place = tacGenerator.emitUnary("tan", $3->place);
+ 1645:           $$ = makeExpr(place, 0.0, false, false, "REAL");
+ 1646:           delete $3;
+ 1647:       }
+ 1648:     | ASINE LPAREN expression RPAREN
+ 1649:       {
+ 1650:           if (!isNumericType($3->typeName)) {
+ 1651:               printf("Semantic Error at line %d: asine() requires numeric operand\n", yylineno);
+ 1652:           }
+ 1653:           std::string place = tacGenerator.emitUnary("asine", $3->place);
+ 1654:           $$ = makeExpr(place, 0.0, false, false, "REAL");
+ 1655:           delete $3;
+ 1656:       }
+ 1657:     | ACOSINE LPAREN expression RPAREN
+ 1658:       {
+ 1659:           if (!isNumericType($3->typeName)) {
+ 1660:               printf("Semantic Error at line %d: acosine() requires numeric operand\n", yylineno);
+ 1661:           }
+ 1662:           std::string place = tacGenerator.emitUnary("acosine", $3->place);
+ 1663:           $$ = makeExpr(place, 0.0, false, false, "REAL");
+ 1664:           delete $3;
+ 1665:       }
+ 1666:     | ATAN LPAREN expression RPAREN
+ 1667:       {
+ 1668:           if (!isNumericType($3->typeName)) {
+ 1669:               printf("Semantic Error at line %d: atan() requires numeric operand\n", yylineno);
+ 1670:           }
+ 1671:           std::string place = tacGenerator.emitUnary("atan", $3->place);
+ 1672:           $$ = makeExpr(place, 0.0, false, false, "REAL");
+ 1673:           delete $3;
+ 1674:       }
+ 1675:     | PRIME LPAREN expression RPAREN
+ 1676:       {
+ 1677:           if (!isNumericType($3->typeName)) {
+ 1678:               printf("Semantic Error at line %d: prime() requires numeric operand\n", yylineno);
+ 1679:           }
+ 1680:           std::string place = tacGenerator.emitUnary("prime", $3->place);
+ 1681:           $$ = makeExpr(place, 0.0, false, false, "FLAG");
+ 1682:           delete $3;
+ 1683:       }
+ 1684:     | NEW IDENTIFIER LPAREN argument_list_opt RPAREN
+ 1685:       {
+ 1686:           if (!isModuleKnown($2)) {
+ 1687:               printf("Semantic Error at line %d: module %s is not defined\n", yylineno, $2);
+ 1688:               $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1689:           } else {
+ 1690:               std::string objectTemp = tacGenerator.newTemp();
+ 1691:               tacGenerator.emitObjectNew($2, objectTemp);
+ 1692: 
+ 1693:               MethodInfo ctorInfo;
+ 1694:               std::string ctorOwner;
+ 1695:               if (resolveMethodInHierarchy($2, $2, $4, ctorInfo, ctorOwner)) {
+ 1696:                   if (ctorInfo.arity != $4) {
+ 1697:                       printf("Semantic Error at line %d: constructor %s expects %d arguments but got %d\n", yylineno, $2, static_cast<int>(ctorInfo.parameterTypes.size()), $4);
+ 1698:                   }
+ 1699:                   std::string initTemp = tacGenerator.emitMethodCall(objectTemp, ctorInfo.selector, $4);
+ 1700:                   (void)initTemp;
+ 1701:               } else if ($4 != 0) {
+ 1702:                   printf("Semantic Error at line %d: module %s has no constructor accepting %d arguments\n", yylineno, $2, $4);
+ 1703:               }
+ 1704: 
+ 1705:               $$ = makeExpr(objectTemp, 0.0, false, false, std::string("MODULE:") + $2);
+ 1706:           }
+ 1707:       }
+ 1708:     | INT_LITERAL
+ 1709:       {
+ 1710:           $$ = makeExpr(toText(static_cast<double>($1)), static_cast<double>($1), true, false, "COUNT");
+ 1711:       }
+ 1712:     | FLOAT_LITERAL
+ 1713:       {
+ 1714:           $$ = makeExpr(toText($1), $1, true, false, "REAL");
+ 1715:       }
+ 1716:     | STRING_LITERAL
+ 1717:       {
+ 1718:           $$ = makeExpr($1, 0.0, true, false, "SYMBOL");
+ 1719:       }
+ 1720:     | THIS
+ 1721:       {
+ 1722:           if (!currentFunctionInModule) {
+ 1723:               printf("Semantic Error at line %d: this used outside module function context\n", yylineno);
+ 1724:               $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1725:           } else {
+ 1726:               $$ = makeExpr("this", 0.0, false, true, std::string("MODULE:") + currentFunctionOwnerModule);
+ 1727:           }
+ 1728:       }
+ 1729:     | SUPER
+ 1730:       {
+ 1731:           if (!currentFunctionInModule) {
+ 1732:               printf("Semantic Error at line %d: super used outside module function context\n", yylineno);
+ 1733:               $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1734:           } else {
+ 1735:               auto moduleIt = moduleTable.find(currentFunctionOwnerModule);
+ 1736:               if (moduleIt == moduleTable.end() || moduleIt->second.baseName.empty()) {
+ 1737:                   printf("Semantic Error at line %d: super used in module without base\n", yylineno);
+ 1738:                   $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1739:               } else {
+ 1740:                   $$ = makeExpr("this", 0.0, false, true, std::string("MODULE:") + moduleIt->second.baseName);
+ 1741:               }
+ 1742:           }
+ 1743:       }
+ 1744:     | IDENTIFIER MEMBER_DOT IDENTIFIER LPAREN argument_list_opt RPAREN
+ 1745:       {
+ 1746:           if (!isDeclaredName($1)) {
+ 1747:               printf("Semantic Error at line %d: object %s not declared\n", yylineno, $1);
+ 1748:               $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1749:           } else {
+ 1750:               std::string objectType = declaredTypeOf($1);
+ 1751:               if (!isModuleType(objectType)) {
+ 1752:                   printf("Semantic Error at line %d: %s is not an object instance\n", yylineno, $1);
+ 1753:                   $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1754:               } else {
+ 1755:                   const std::string objectModule = moduleNameFromType(objectType);
+ 1756:                   MethodInfo methodInfo;
+ 1757:                   std::string ownerModule;
+ 1758:                   if (!resolveMethodInHierarchy(objectModule, $3, $5, methodInfo, ownerModule)) {
+ 1759:                       printf("Semantic Error at line %d: method %s not found in module %s\n", yylineno, $3, objectModule.c_str());
+ 1760:                       $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1761:                   } else if (!canAccessMember(methodInfo.isPublic, ownerModule)) {
+ 1762:                       printf("Semantic Error at line %d: method %s is private in module %s\n", yylineno, $3, ownerModule.c_str());
+ 1763:                       $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1764:                   } else {
+ 1765:                       if (methodInfo.arity != $5) {
+ 1766:                           printf("Semantic Error at line %d: method %s expects %d arguments but got %d\n", yylineno, $3, static_cast<int>(methodInfo.parameterTypes.size()), $5);
+ 1767:                       }
+ 1768:                       std::string callTemp = tacGenerator.emitMethodCall($1, methodInfo.selector, $5);
+ 1769:                       $$ = makeExpr(callTemp, 0.0, false, false, methodInfo.returnType);
+ 1770:                   }
+ 1771:               }
+ 1772:           }
+ 1773:       }
+ 1774:     | THIS MEMBER_DOT IDENTIFIER LPAREN argument_list_opt RPAREN
+ 1775:       {
+ 1776:           if (!currentFunctionInModule) {
+ 1777:               printf("Semantic Error at line %d: this used outside module function context\n", yylineno);
+ 1778:               $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1779:           } else {
+ 1780:               MethodInfo methodInfo;
+ 1781:               std::string ownerModule;
+ 1782:               if (!resolveMethodInHierarchy(currentFunctionOwnerModule, $3, $5, methodInfo, ownerModule)) {
+ 1783:                   printf("Semantic Error at line %d: method %s not found in module %s\n", yylineno, $3, currentFunctionOwnerModule.c_str());
+ 1784:                   $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1785:               } else if (!canAccessMember(methodInfo.isPublic, ownerModule)) {
+ 1786:                   printf("Semantic Error at line %d: method %s is private in module %s\n", yylineno, $3, ownerModule.c_str());
+ 1787:                   $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1788:               } else {
+ 1789:                   if (methodInfo.arity != $5) {
+ 1790:                       printf("Semantic Error at line %d: method %s expects %d arguments but got %d\n", yylineno, $3, static_cast<int>(methodInfo.parameterTypes.size()), $5);
+ 1791:                   }
+ 1792:                   std::string callTemp = tacGenerator.emitMethodCall("this", methodInfo.selector, $5);
+ 1793:                   $$ = makeExpr(callTemp, 0.0, false, false, methodInfo.returnType);
+ 1794:               }
+ 1795:           }
+ 1796:       }
+ 1797:     | SUPER MEMBER_DOT IDENTIFIER LPAREN argument_list_opt RPAREN
+ 1798:       {
+ 1799:           if (!currentFunctionInModule) {
+ 1800:               printf("Semantic Error at line %d: super used outside module function context\n", yylineno);
+ 1801:               $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1802:           } else {
+ 1803:               auto moduleIt = moduleTable.find(currentFunctionOwnerModule);
+ 1804:               if (moduleIt == moduleTable.end() || moduleIt->second.baseName.empty()) {
+ 1805:                   printf("Semantic Error at line %d: super used in module without base\n", yylineno);
+ 1806:                   $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1807:               } else {
+ 1808:                   MethodInfo methodInfo;
+ 1809:                   std::string ownerModule;
+ 1810:                   if (!resolveMethodInHierarchy(moduleIt->second.baseName, $3, $5, methodInfo, ownerModule)) {
+ 1811:                       printf("Semantic Error at line %d: method %s not found in base module chain\n", yylineno, $3);
+ 1812:                       $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1813:                   } else if (!canAccessMember(methodInfo.isPublic, ownerModule)) {
+ 1814:                       printf("Semantic Error at line %d: method %s is private in module %s\n", yylineno, $3, ownerModule.c_str());
+ 1815:                       $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1816:                   } else {
+ 1817:                       if (methodInfo.arity != $5) {
+ 1818:                           printf("Semantic Error at line %d: method %s expects %d arguments but got %d\n", yylineno, $3, static_cast<int>(methodInfo.parameterTypes.size()), $5);
+ 1819:                       }
+ 1820:                       std::string syntheticMethod = std::string("super:") + moduleIt->second.baseName + ":" + methodInfo.selector;
+ 1821:                       std::string callTemp = tacGenerator.emitMethodCall("this", syntheticMethod, $5);
+ 1822:                       $$ = makeExpr(callTemp, 0.0, false, false, methodInfo.returnType);
+ 1823:                   }
+ 1824:               }
+ 1825:           }
+ 1826:       }
+ 1827:     | IDENTIFIER MEMBER_DOT IDENTIFIER
+ 1828:       {
+ 1829:           if (!isDeclaredName($1)) {
+ 1830:               printf("Semantic Error at line %d: object %s not declared\n", yylineno, $1);
+ 1831:               $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1832:           } else {
+ 1833:               std::string objectType = declaredTypeOf($1);
+ 1834:               if (!isModuleType(objectType)) {
+ 1835:                   printf("Semantic Error at line %d: %s is not an object instance\n", yylineno, $1);
+ 1836:                   $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1837:               } else {
+ 1838:                   FieldInfo fieldInfo;
+ 1839:                   std::string ownerModule;
+ 1840:                   const std::string objectModule = moduleNameFromType(objectType);
+ 1841:                   if (!resolveFieldInHierarchy(objectModule, $3, fieldInfo, ownerModule)) {
+ 1842:                       printf("Semantic Error at line %d: field %s not found in module %s\n", yylineno, $3, objectModule.c_str());
+ 1843:                       $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1844:                   } else if (!canAccessMember(fieldInfo.isPublic, ownerModule)) {
+ 1845:                       printf("Semantic Error at line %d: field %s is private in module %s\n", yylineno, $3, ownerModule.c_str());
+ 1846:                       $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1847:                   } else {
+ 1848:                       std::string temp = tacGenerator.emitFieldLoad($1, $3);
+ 1849:                       $$ = makeExpr(temp, 0.0, false, false, fieldInfo.typeName);
+ 1850:                   }
+ 1851:               }
+ 1852:           }
+ 1853:       }
+ 1854:     | THIS MEMBER_DOT IDENTIFIER
+ 1855:       {
+ 1856:           if (!currentFunctionInModule) {
+ 1857:               printf("Semantic Error at line %d: this used outside module function context\n", yylineno);
+ 1858:               $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1859:           } else {
+ 1860:               FieldInfo fieldInfo;
+ 1861:               std::string ownerModule;
+ 1862:               if (!resolveFieldInHierarchy(currentFunctionOwnerModule, $3, fieldInfo, ownerModule)) {
+ 1863:                   printf("Semantic Error at line %d: field %s not found in module %s\n", yylineno, $3, currentFunctionOwnerModule.c_str());
+ 1864:                   $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1865:               } else if (!canAccessMember(fieldInfo.isPublic, ownerModule)) {
+ 1866:                   printf("Semantic Error at line %d: field %s is private in module %s\n", yylineno, $3, ownerModule.c_str());
+ 1867:                   $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1868:               } else {
+ 1869:                   std::string temp = tacGenerator.emitFieldLoad("this", $3);
+ 1870:                   $$ = makeExpr(temp, 0.0, false, false, fieldInfo.typeName);
+ 1871:               }
+ 1872:           }
+ 1873:       }
+ 1874:     | SUPER MEMBER_DOT IDENTIFIER
+ 1875:       {
+ 1876:           if (!currentFunctionInModule) {
+ 1877:               printf("Semantic Error at line %d: super used outside module function context\n", yylineno);
+ 1878:               $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1879:           } else {
+ 1880:               auto moduleIt = moduleTable.find(currentFunctionOwnerModule);
+ 1881:               if (moduleIt == moduleTable.end() || moduleIt->second.baseName.empty()) {
+ 1882:                   printf("Semantic Error at line %d: super used in module without base\n", yylineno);
+ 1883:                   $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1884:               } else {
+ 1885:                   FieldInfo fieldInfo;
+ 1886:                   std::string ownerModule;
+ 1887:                   if (!resolveFieldInHierarchy(moduleIt->second.baseName, $3, fieldInfo, ownerModule)) {
+ 1888:                       printf("Semantic Error at line %d: field %s not found in base module chain\n", yylineno, $3);
+ 1889:                       $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1890:                   } else if (!canAccessMember(fieldInfo.isPublic, ownerModule)) {
+ 1891:                       printf("Semantic Error at line %d: field %s is private in module %s\n", yylineno, $3, ownerModule.c_str());
+ 1892:                       $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1893:                   } else {
+ 1894:                       std::string temp = tacGenerator.emitFieldLoad("this", $3);
+ 1895:                       $$ = makeExpr(temp, 0.0, false, false, fieldInfo.typeName);
+ 1896:                   }
+ 1897:               }
+ 1898:           }
+ 1899:       }
+ 1900:     | IDENTIFIER
+ 1901:       {
+ 1902:           if (!isDeclaredName($1)) {
+ 1903:               if (currentFunctionInModule) {
+ 1904:                   FieldInfo fieldInfo;
+ 1905:                   std::string ownerModule;
+ 1906:                   if (resolveFieldInHierarchy(currentFunctionOwnerModule, $1, fieldInfo, ownerModule)) {
+ 1907:                       if (!canAccessMember(fieldInfo.isPublic, ownerModule)) {
+ 1908:                           printf("Semantic Error at line %d: field %s is private in module %s\n", yylineno, $1, ownerModule.c_str());
+ 1909:                           $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1910:                       } else {
+ 1911:                           std::string temp = tacGenerator.emitFieldLoad("this", $1);
+ 1912:                           $$ = makeExpr(temp, 0.0, false, false, fieldInfo.typeName);
+ 1913:                       }
+ 1914:                   } else {
+ 1915:                       printf("Semantic Error at line %d: variable %s not declared\n", yylineno, $1);
+ 1916:                       $$ = makeExpr($1, 0.0, false, false, "UNKNOWN");
+ 1917:                   }
+ 1918:               } else {
+ 1919:                   printf("Semantic Error at line %d: variable %s not declared\n", yylineno, $1);
+ 1920:                   $$ = makeExpr($1, 0.0, false, false, "UNKNOWN");
+ 1921:               }
+ 1922:           } else {
+ 1923:               $$ = makeExpr($1, 0.0, false, true, declaredTypeOf($1));
+ 1924:           }
+ 1925:       }
+ 1926:     | IDENTIFIER LBRACKET expression RBRACKET
+ 1927:       {
+ 1928:           if (!isDeclaredName($1)) {
+ 1929:               printf("Semantic Error at line %d: array %s not declared\n", yylineno, $1);
+ 1930:               $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1931:           } else {
+ 1932:               std::string temp = tacGenerator.emitArrayLoad($1, $3->place);
+ 1933:               $$ = makeExpr(temp, 0.0, false, false, baseType(declaredTypeOf($1)));
+ 1934:           }
+ 1935:           delete $3;
+ 1936:       }
+ 1937:     | IDENTIFIER LPAREN argument_list_opt RPAREN
+ 1938:       {
+ 1939:           FunctionOverloadInfo overload;
+ 1940:           if (!resolveGlobalFunctionOverload($1, $3, overload)) {
+ 1941:               printf("Semantic Error at line %d: no overload of function %s accepts %d arguments\n", yylineno, $1, $3);
+ 1942:               $$ = makeExpr("0", 0.0, false, false, "UNKNOWN");
+ 1943:           } else {
+ 1944:               std::string callTemp = tacGenerator.emitCall(overload.qualifiedName, $3);
+ 1945:               $$ = makeExpr(callTemp, 0.0, false, false, overload.returnType);
+ 1946:           }
+ 1947:       }
+ 1948:     | LPAREN expression RPAREN
+ 1949:       {
+ 1950:           $$ = $2;
+ 1951:       }
+ 1952:     ;
+ 1953: 
+ 1954: 
+ 1955: %%
+ 1956: 
+ 1957: void yyerror(const char *s) {
+ 1958:     const char* tokenText = (yytext && yytext[0] != '\0') ? yytext : "<eof>";
+ 1959:     std::string hint = "Check statement terminators (.), bracket pairing, and token order.";
+ 1960: 
+ 1961:     if (strstr(s, "expecting DOT") != nullptr) {
+ 1962:         hint = "A statement is likely missing a terminating period '.' before this point.";
+ 1963:     } else if (strstr(s, "expecting RBRACE") != nullptr) {
+ 1964:         hint = "A block is missing a closing brace '}'.";
+ 1965:     } else if (strstr(s, "expecting RPAREN") != nullptr) {
+ 1966:         hint = "An expression or call is missing a closing parenthesis ')'.";
+ 1967:     } else if (strstr(s, "unexpected $end") != nullptr) {
+ 1968:         hint = "Input ended too early. Verify that mission/block braces and final 'success' are present.";
+ 1969:     } else if (strcmp(tokenText, "success") == 0) {
+ 1970:         hint = "The mission body may not be closed correctly before 'success'.";
+ 1971:     } else if (strcmp(tokenText, "}") == 0) {
+ 1972:         hint = "Unexpected '}'. Check for an extra closing brace or a missing statement before it.";
+ 1973:     }
+ 1974: 
+ 1975:     printf("SYNTAX ERROR at line %d: near '%s' - %s\n", yylineno, tokenText, hint.c_str());
+ 1976: }

@@ -137,3 +137,44 @@ backend/compiler/
 For exact lexer/parser/symbol/TAC line-by-line execution points for conditionals, loops, functions, and classes, see:
 
 - `docs/compiler-feature-execution-map.md`
+
+## Why IR and Optimization Exist (Teacher-Ready)
+
+### What IR is in this compiler
+
+AstroScript uses a three-address intermediate representation (TAC) as a bridge between parsing and runtime.
+
+- Each IR instruction is a compact 4-field record: operation + up to two inputs + one output.
+- Examples of operations include assignment, arithmetic, control flow jumps, function calls, array access, object field access, and built-in math functions.
+- Parser semantic actions emit these TAC instructions directly while reducing grammar rules.
+
+So instead of executing syntax-tree nodes directly, the compiler first rewrites source constructs into a uniform low-level instruction list.
+
+### What optimization is doing
+
+Before execution, `optimize()` applies three passes in order:
+
+1. `constantFold()`
+     - Computes expressions early when both operands are compile-time numeric constants.
+     - Also folds unary math built-ins when domain-safe (for example avoids folding invalid `root(-x)` or `logarithm(0)`).
+2. `algebraicSimplify()`
+     - Applies identity rules like `x + 0 -> x`, `x * 1 -> x`, `x * 0 -> 0`, `x / 1 -> x`.
+3. `removeRedundantMoves()`
+     - Removes no-op moves such as `x = x`.
+
+These passes are local and semantics-preserving for the supported cases.
+
+### Why we do this (core justification)
+
+1. Separation of concerns
+     - Front-end (syntax and semantic checks) is separated from runtime execution.
+2. Target independence
+     - The same IR can be interpreted now and can later support additional backends if needed.
+3. Easier correctness and debugging
+     - TAC is explicit (`label`, `goto`, `ifFalse`, `call`), so control/data flow is visible and testable.
+4. Better performance and cleaner output
+     - Constant/algebraic simplifications reduce runtime work.
+5. Better pedagogy
+     - Students can inspect optimized TAC and C-like translation, then compare with source behavior.
+
+In short: IR is the canonical executable form, and optimization is an early clean-up step that reduces unnecessary runtime effort without changing intended program behavior.

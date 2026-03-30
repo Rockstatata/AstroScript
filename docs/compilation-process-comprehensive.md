@@ -367,3 +367,91 @@ Use this short flow while presenting:
 3. "Semantic checks currently focus on symbol existence and call arity, while runtime checks catch unsafe execution cases."
 4. "The web playground calls an API route that executes the compiler binary and converts raw output into structured diagnostics and tabs."
 5. "So students can inspect both final output and intermediate representation in one place, which is ideal for learning compiler internals."
+
+---
+
+## 8) IR and Optimization: What It Actually Does and Why
+
+This section is a direct answer to the common instructor question: "What is your IR/optimization layer doing in practice?"
+
+### 8.1 What "IR" means here
+
+The compiler lowers AstroScript programs into Three-Address Code (TAC).
+
+- Format: `op, arg1, arg2, result`
+- Representation: linear instruction list
+- Execution model: instruction pointer over TAC, with labels and jumps
+
+The TAC layer includes operations for:
+
+- Arithmetic and comparisons (`+`, `-`, `*`, `/`, `%`, `**`, relational ops)
+- Boolean logic (`AND`, `OR`, `XOR`, `ifFalse`)
+- Variables and assignment (`decl`, `=`)
+- Arrays (`decl_arr`, `store`, `load`)
+- Functions (`func_begin`, `param_def`, `param`, `call`, `return`, `func_end`)
+- Objects/modules (`obj_new`, `field_set`, `field_get`, `mcall`)
+- Built-ins (`root`, `logarithm`, `sine`, `prime`, etc.)
+
+### 8.2 How source code is lowered
+
+Parser semantic actions emit TAC while parsing. Example patterns:
+
+- `verify (...) { ... }` lowers into conditional jump blocks with labels.
+- `orbit` loops lower into explicit loop labels + back edges (`goto`).
+- function declarations emit `func_begin/func_end` and parameter definitions.
+- calls push arguments (`param`) before `call` or `mcall`.
+
+So high-level syntax is converted into explicit control flow and data flow.
+
+### 8.3 What optimization does in this codebase
+
+`optimize()` runs three passes before execution:
+
+1. Constant folding
+   - Precomputes pure constant expressions and constant unary built-ins.
+2. Algebraic simplification
+   - Removes identity operations (`x+0`, `x*1`, `x/1`) and trivial zero cases (`x*0`).
+3. Redundant move elimination
+   - Removes assignments that do nothing (`a = a`).
+
+This is intentionally a lightweight local optimizer (not a global SSA optimizer).
+
+### 8.4 Concrete before/after intuition
+
+Conceptual lowering for a declaration assignment:
+
+- Source: `telemetry count x := 5 add 3.`
+- Unoptimized TAC idea:
+  - `decl COUNT x`
+  - `t1 = 5 + 3`
+  - `x = t1`
+- After constant folding:
+  - `decl COUNT x`
+  - `t1 = 8`
+  - `x = t1`
+
+Fewer runtime computations are needed, and IR becomes easier to inspect.
+
+### 8.5 Why we do this (design rationale)
+
+1. Correctness architecture
+   - Parsing/semantic validation and execution are separated by a stable intermediate form.
+2. Runtime simplicity
+   - Interpreter only needs to execute TAC ops, not full grammar-level constructs.
+3. Observability
+   - Optimized TAC is printable and traceable, which helps debugging and grading.
+4. Performance improvement
+   - Basic compile-time simplifications reduce instruction count and repeated math at runtime.
+5. Extensibility
+   - New language features can be added by defining their TAC lowering + TAC runtime op behavior.
+
+### 8.6 Why not execute source syntax directly?
+
+Direct AST execution can work, but TAC gives a cleaner compiler boundary:
+
+- uniform instruction semantics,
+- explicit control-flow graph via labels/jumps,
+- reusable optimization stage,
+- reusable backend for interpreter and C-like projection.
+
+In one line: IR is the canonical machine-like form of AstroScript in this project, and optimization is the safe pre-execution simplification stage that improves clarity and runtime cost.

@@ -811,3 +811,61 @@ Your backend is a full educational compiler runtime stack:
 It is not a toy tokenizer; it has meaningful control-flow lowering, function call machinery, expression typing logic, array runtime semantics, and deployment-aware packaging scripts.
 
 If you keep lexer tokens, parser productions, semantic checks, TAC emits, and interpreter op support synchronized, each keyword and language feature remains alive end-to-end.
+
+---
+
+## 4.14 IR and optimization explained for evaluation
+
+This section is intended as a direct, instructor-facing explanation.
+
+### 4.14.1 What IR is doing in AstroScript
+
+After parsing and semantic checks, the compiler does not execute source syntax directly.
+It first converts code into TAC (three-address code), where each instruction has:
+
+- operation (`op`)
+- first input (`arg1`)
+- second input (`arg2`)
+- output/target (`result`)
+
+This turns high-level constructs into explicit low-level steps.
+
+Examples:
+
+- conditionals and loops become labels + conditional/unconditional jumps.
+- function calls become `param` pushes + `call` + `return` handling.
+- arrays become `decl_arr`, `store`, `load` operations.
+- module/object behavior becomes `obj_new`, `field_get`, `field_set`, and `mcall`.
+
+The TAC interpreter then executes this linear instruction stream with a program counter, frame stack, array store, object store, and call stack.
+
+### 4.14.2 What optimization is doing in AstroScript
+
+Before interpretation, TAC is optimized by three passes:
+
+1. `constantFold`
+  - evaluates compile-time numeric expressions and safe unary math built-ins.
+2. `algebraicSimplify`
+  - applies arithmetic identities (like `x+0`, `x*1`, `x/1`) and zero-product rules.
+3. `removeRedundantMoves`
+  - deletes no-op assignments (`a=a`).
+
+Important: optimization is conservative for safety.
+If folding would violate a domain rule (for example negative square root), the instruction is left for runtime checks.
+
+### 4.14.3 Why this layer exists (the "why" answer)
+
+1. Better compiler design
+  - front-end concerns (grammar/typing) are separated from execution concerns.
+2. Easier verification
+  - TAC provides a clear, inspectable representation for debugging and grading.
+3. Runtime efficiency
+  - simple compile-time reductions reduce interpreter work.
+4. Feature scalability
+  - adding language features becomes "lower to TAC + execute TAC op".
+5. Teaching value
+  - students can observe source -> optimized IR -> execution, which exposes compiler internals clearly.
+
+### 4.14.4 Short oral answer (ready to say)
+
+"In our compiler, IR is the standardized executable form of the language. The parser lowers AstroScript statements into TAC instructions, and then a small optimizer removes constant and redundant work before execution. We do this to separate syntax from runtime, improve clarity, reduce runtime cost, and make the whole compiler pipeline observable for debugging and learning."
